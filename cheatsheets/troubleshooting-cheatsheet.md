@@ -2,6 +2,20 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Pod States Decision Table](#pod-states-decision-table)
+- [Quick Diagnosis Commands](#quick-diagnosis-commands)
+- [Node Troubleshooting](#node-troubleshooting)
+- [Network Debugging One-liners](#network-debugging-one-liners)
+- [Common Error Patterns & Fixes](#common-error-patterns--fixes)
+- [Debug Pod Snippets](#debug-pod-snippets)
+- [DNS Testing](#dns-testing)
+- [Certificate Debugging](#certificate-debugging)
+- [Performance Quick Checks](#performance-quick-checks)
+
+---
+
 ## Pod States Decision Table
 
 | Status | Meaning | First Action |
@@ -23,6 +37,8 @@
 | `Init:X/Y` | X of Y init containers complete | `kubectl logs <pod> -c <init-container>` |
 | `Init:CrashLoopBackOff` | Init container crashing | `kubectl logs <pod> -c <init-container-name>` |
 | `PodInitializing` | All init containers done, starting main | Normal transient state |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Quick Diagnosis Commands
 
@@ -115,6 +131,8 @@ kubectl exec <pod> -- ss -tlnp
 kubectl exec <pod> -- cat /etc/resolv.conf
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Node Troubleshooting
 
 ```bash
@@ -154,6 +172,8 @@ vmstat 1 5
 iostat -x 1 5
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Network Debugging One-liners
 
 ```bash
@@ -191,6 +211,8 @@ kubectl logs -n kube-system -l k8s-app=kube-dns
 sudo iptables -t nat -L KUBE-SERVICES -n | grep <cluster-ip>
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Common Error Patterns & Fixes
 
 | Error | Cause | Fix |
@@ -211,6 +233,8 @@ sudo iptables -t nat -L KUBE-SERVICES -n | grep <cluster-ip>
 | `cannot list resource "pods"` | Missing RBAC permissions | Add Role/ClusterRole with correct rules |
 | `resource quota exceeded` | Namespace quota hit | `kubectl describe quota -n <ns>`; increase or clean up |
 | `pod disruption budget` blocks drain | PDB minAvailable not met | Temporarily delete PDB or scale up first |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Debug Pod Snippets
 
@@ -241,6 +265,8 @@ kubectl debug -it <pod> --image=busybox --copy-to=debug-pod
 kubectl debug node/<node-name> -it --image=ubuntu
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## DNS Testing
 
 ```bash
@@ -268,6 +294,8 @@ kubectl get cm coredns -n kube-system -o yaml
 # Restart CoreDNS
 kubectl rollout restart deploy/coredns -n kube-system
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Certificate Debugging
 
@@ -305,6 +333,8 @@ kubectl get challenge -A        # ACME challenges
 kubectl logs -n cert-manager deploy/cert-manager
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Performance Quick Checks
 
 ```bash
@@ -339,6 +369,8 @@ kubectl describe resourcequota -A
 kubectl get limitrange -A
 kubectl describe limitrange -A
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

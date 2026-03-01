@@ -6,14 +6,24 @@
 - [The Example Application](#the-example-application)
 - [Pre-Migration Checklist](#pre-migration-checklist)
 - [Phase 1: Assess Your Existing Podman Setup](#phase-1-assess-your-existing-podman-setup)
+- [Quadlet-to-Manifest Conversion Script](#quadlet-to-manifest-conversion-script)
 - [Phase 2: Build and Push Images to a Registry](#phase-2-build-and-push-images-to-a-registry)
 - [Phase 3: Write Kubernetes Manifests](#phase-3-write-kubernetes-manifests)
+- [Systemd Unit → Kubernetes Job Pattern](#systemd-unit--kubernetes-job-pattern)
+- [Database Migration Jobs](#database-migration-jobs)
+- [NetworkPolicy Translation](#networkpolicy-translation)
+- [SealedSecrets Setup](#sealedsecrets-setup)
 - [Phase 4: Test in a Staging Namespace](#phase-4-test-in-a-staging-namespace)
+- [Kustomize Promotion Flow](#kustomize-promotion-flow)
 - [Phase 5: Data Migration](#phase-5-data-migration)
 - [Phase 6: Cutover](#phase-6-cutover)
+- [Canary Deployment Pattern](#canary-deployment-pattern)
 - [Phase 7: Post-Migration Validation](#phase-7-post-migration-validation)
+- [Post-Migration Runbook Template](#post-migration-runbook-template)
 - [Rollback Plan](#rollback-plan)
 - [Migration Timeline Diagram](#migration-timeline-diagram)
+- [Common Pitfalls](#common-pitfalls)
+- [Further Reading](#further-reading)
 - [Lab](#lab)
 
 ---
@@ -188,6 +198,85 @@ VOLUMES:
 NETWORKS:
   taskr-net (bridge, 10.89.0.0/24) → replaced by k8s cluster DNS
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Quadlet-to-Manifest Conversion Script
+
+If you are running containers via **Quadlet** (systemd `.container` files), this script extracts the key fields and maps them to Kubernetes manifest stubs. It is not a full converter — treat its output as a starting point.
+
+```bash
+#!/usr/bin/env bash
+# quadlet-to-manifest.sh
+# Usage: ./quadlet-to-manifest.sh taskr-web.container
+#
+# Reads a Quadlet .container file and prints a rough Kubernetes Deployment stub.
+
+QUADLET_FILE="${1:?Usage: $0 <file.container>}"
+NAME=$(basename "$QUADLET_FILE" .container)
+
+# Extract fields
+IMAGE=$(grep -i '^Image=' "$QUADLET_FILE" | cut -d= -f2-)
+ENVS=$(grep -i '^Environment=' "$QUADLET_FILE")
+PORTS=$(grep -i '^PublishPort=' "$QUADLET_FILE")
+VOLUMES=$(grep -i '^Volume=' "$QUADLET_FILE")
+
+echo "# === Deployment stub for: $NAME ==="
+cat <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${NAME}
+  namespace: FIXME
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${NAME}
+  template:
+    metadata:
+      labels:
+        app: ${NAME}
+    spec:
+      containers:
+      - name: ${NAME}
+        image: ${IMAGE}
+        # TODO: add env, ports, volumeMounts from your Quadlet below
+        # --- Quadlet Environment lines ---
+$(echo "$ENVS" | sed 's/Environment=/        # env: /')
+        # --- Quadlet PublishPort lines ---
+$(echo "$PORTS" | sed 's/PublishPort=/        # port: /')
+        # --- Quadlet Volume lines ---
+$(echo "$VOLUMES" | sed 's/Volume=/        # volumeMount: /')
+YAML
+echo ""
+echo "# NEXT STEPS:"
+echo "#   1. Replace 'FIXME' namespace"
+echo "#   2. Convert env= lines to env: - name: / value: or secretKeyRef:"
+echo "#   3. Convert volume= lines to volumeMounts: + PVC"
+echo "#   4. Add resource limits, probes, imagePullSecrets"
+```
+
+**Example Quadlet file and its manifest output:**
+
+```ini
+# taskr-web.container (Quadlet)
+[Container]
+Image=ghcr.io/myorg/taskr-web:2.1.0
+PublishPort=3000:3000
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DATABASE_URL=postgres://taskr:secret@localhost:5432/taskr
+Volume=taskr-uploads:/app/uploads
+```
+
+```bash
+./quadlet-to-manifest.sh taskr-web.container
+```
+
+Produces a stub Deployment you then refine — replacing `localhost` hostnames with k8s service DNS names, moving secrets into `Secret` objects, and converting `Volume=` to `PVC` + `volumeMounts`.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -557,6 +646,333 @@ spec:
 
 ---
 
+## Systemd Unit → Kubernetes Job Pattern
+
+Podman workloads often include one-shot systemd units that run tasks like schema creation, seed data loading, or scheduled exports. These translate to Kubernetes `Job` or `CronJob` resources.
+
+```ini
+# taskr-schema-init.service (Podman / systemd one-shot unit)
+[Unit]
+Description=Taskr DB schema init
+
+[Service]
+Type=oneshot
+ExecStart=podman run --rm \
+  -e DATABASE_URL=postgres://taskr:secret@localhost:5432/taskr \
+  ghcr.io/myorg/taskr-web:2.1.0 \
+  node dist/scripts/migrate.js
+```
+
+```yaml
+# Kubernetes equivalent — Job (runs once to completion)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: taskr-schema-init
+  namespace: taskr
+spec:
+  backoffLimit: 3          # retry up to 3 times on failure
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z postgres 5432; do sleep 2; done']
+      containers:
+      - name: migrate
+        image: ghcr.io/myorg/taskr-web:2.1.0
+        command: ["node", "dist/scripts/migrate.js"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: taskr-secrets
+              key: database-url
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+```
+
+For a **recurring** systemd timer (e.g., nightly export), use `CronJob`:
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: taskr-nightly-export
+  namespace: taskr
+spec:
+  schedule: "0 2 * * *"   # 02:00 UTC daily — same as the systemd OnCalendar=
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: export
+            image: ghcr.io/myorg/taskr-web:2.1.0
+            command: ["node", "dist/scripts/export.js"]
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: database-url
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Database Migration Jobs
+
+Running DB schema migrations in k3s requires care — the migration must complete before the new app version starts serving traffic.
+
+**Pattern: migration Job as an init step in CI/CD**
+
+```mermaid
+flowchart LR
+    CI[CI/CD pipeline] -->|kubectl apply| MJ[Migration Job]
+    MJ -->|kubectl wait --for=condition=complete| DONE{Complete?}
+    DONE -->|Yes| APP[Deploy web Deployment]
+    DONE -->|No| FAIL[Pipeline fails\nrollback]
+```
+
+```bash
+# In your CI/CD pipeline (Gitea Actions / GitHub Actions)
+# 1. Apply the migration Job
+kubectl apply -f k8s/migration-job.yaml
+
+# 2. Wait for it to complete (timeout 5 min)
+kubectl wait job/taskr-schema-init \
+  --for=condition=complete \
+  --timeout=300s \
+  -n taskr
+
+# 3. Only then deploy the app
+kubectl apply -f k8s/web-deployment.yaml
+kubectl rollout status deployment/web -n taskr
+```
+
+**Migration Job with versioned naming** (prevents re-running old migrations):
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: taskr-migrate-v2-2-0    # versioned — immutable after apply
+  namespace: taskr
+  annotations:
+    app.kubernetes.io/version: "2.2.0"
+spec:
+  ttlSecondsAfterFinished: 86400    # auto-delete after 24h
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: migrate
+        image: ghcr.io/myorg/taskr-web:2.2.0
+        command: ["node", "dist/scripts/migrate.js", "--to", "2.2.0"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: taskr-secrets
+              key: database-url
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## NetworkPolicy Translation
+
+Podman's `--network taskr-net` gives isolation between host and the app, but all containers on `taskr-net` can talk freely. Kubernetes default is similarly open — **all pods can reach all services**. Add `NetworkPolicy` to enforce the least-privilege network model.
+
+```mermaid
+graph TD
+    subgraph taskr namespace
+        WEB[web pods] -->|port 5432| PG[postgres]
+        WEB -->|port 6379| REDIS[redis]
+        ING[Traefik Ingress] -->|port 80| WEB
+    end
+    EXTERN[External] -->|HTTPS| ING
+    PG -->|blocked ✗| REDIS
+    REDIS -->|blocked ✗| PG
+```
+
+```yaml
+# networkpolicy.yaml — replaces Compose's implicit network isolation
+
+# 1. Default: deny all ingress/egress in the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: taskr
+spec:
+  podSelector: {}      # applies to ALL pods
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# 2. Allow web → postgres
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-postgres
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: web
+    ports:
+    - port: 5432
+---
+# 3. Allow web → redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-redis
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: web
+    ports:
+    - port: 6379
+---
+# 4. Allow ingress controller → web
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-web
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: web
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 3000
+---
+# 5. Allow all pods DNS egress (CoreDNS)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: taskr
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+```
+
+> **Podman equivalent:** Podman's `--network` flag provides host-level isolation. NetworkPolicy provides intra-cluster, pod-level isolation — much more granular.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## SealedSecrets Setup
+
+Plain Kubernetes `Secret` objects are base64-encoded, not encrypted — committing them to git is insecure. **SealedSecrets** encrypts secrets with the cluster's public key so only that cluster can decrypt them.
+
+```bash
+# ── Install the SealedSecrets controller ─────────────────────────────────
+kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/latest/download/controller.yaml
+
+# Wait for controller
+kubectl rollout status deployment/sealed-secrets-controller -n kube-system
+
+# ── Install kubeseal CLI ──────────────────────────────────────────────────
+curl -L https://github.com/bitnami-labs/sealed-secrets/releases/latest/download/kubeseal-linux-amd64 \
+  -o /usr/local/bin/kubeseal && chmod +x /usr/local/bin/kubeseal
+
+# ── Seal a secret ─────────────────────────────────────────────────────────
+# Start from a plain secret file (never committed)
+cat > /tmp/taskr-secrets-plain.yaml <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: taskr-secrets
+  namespace: taskr
+type: Opaque
+stringData:
+  postgres-password: "secretpassword"
+  session-secret: "my-super-secret"
+  database-url: "postgres://taskr:secretpassword@postgres:5432/taskr"
+  redis-url: "redis://redis:6379"
+EOF
+
+# Seal it (uses the cluster's public key)
+kubeseal --format yaml < /tmp/taskr-secrets-plain.yaml > k8s/taskr-secrets-sealed.yaml
+
+# ✅ SAFE to commit to git
+git add k8s/taskr-secrets-sealed.yaml
+git commit -m "chore: add sealed secrets for taskr"
+
+# ── Apply the sealed secret ────────────────────────────────────────────────
+kubectl apply -f k8s/taskr-secrets-sealed.yaml
+
+# The controller decrypts it and creates a plain Secret in the cluster
+kubectl get secret taskr-secrets -n taskr
+```
+
+```yaml
+# What taskr-secrets-sealed.yaml looks like (safe to commit)
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: taskr-secrets
+  namespace: taskr
+spec:
+  encryptedData:
+    postgres-password: AgB3k9...long-base64-ciphertext...==
+    session-secret: AgCm2P...long-base64-ciphertext...==
+    database-url: AgDw4R...long-base64-ciphertext...==
+    redis-url: AgEk8T...long-base64-ciphertext...==
+```
+
+> **Re-sealing for a new cluster:** If you set up a fresh k3s cluster, the old SealedSecrets cannot be decrypted. Backup the controller's key pair:
+> ```bash
+> kubectl get secret -n kube-system \
+>   -l sealedsecrets.bitnami.com/sealed-secrets-key \
+>   -o yaml > sealed-secrets-master-key.yaml
+> # Store this backup SECURELY — not in git
+> ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
 ## Phase 4: Test in a Staging Namespace
 
 **Never migrate directly to production.** Test in a separate namespace first.
@@ -598,6 +1014,60 @@ kubectl exec -n taskr-staging statefulset/postgres -- \
 
 # 8. Tear down staging when satisfied
 kubectl delete namespace taskr-staging
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Kustomize Promotion Flow
+
+Once staging passes, promote to production using Kustomize overlays — the same manifests, different config.
+
+```
+k8s/
+├── base/
+│   ├── kustomization.yaml
+│   ├── namespace.yaml
+│   ├── deployment.yaml
+│   ├── statefulset.yaml
+│   ├── services.yaml
+│   └── ingress.yaml
+├── overlays/
+│   ├── staging/
+│   │   ├── kustomization.yaml     # namespace: taskr-staging, replicas: 1
+│   │   ├── patch-replicas.yaml
+│   │   └── sealed-secret-staging.yaml
+│   └── production/
+│       ├── kustomization.yaml     # namespace: taskr, replicas: 2
+│       ├── patch-replicas.yaml
+│       ├── patch-resources.yaml   # higher CPU/memory limits
+│       ├── hpa.yaml
+│       └── sealed-secret-prod.yaml
+```
+
+```bash
+# Deploy to staging
+kubectl apply -k k8s/overlays/staging
+kubectl rollout status deployment/web -n taskr-staging
+
+# Run smoke tests
+kubectl port-forward svc/web 8080:80 -n taskr-staging &
+curl -sf http://localhost:8080/healthz
+
+# Promote to production (same manifests, production overlay)
+kubectl diff -k k8s/overlays/production   # preview changes
+kubectl apply -k k8s/overlays/production
+kubectl rollout status deployment/web -n taskr
+```
+
+**Image tag promotion:** Update the image tag in the base or overlay for each environment, then promote the same tested tag:
+
+```yaml
+# overlays/production/kustomization.yaml
+images:
+- name: ghcr.io/myorg/taskr-web
+  newTag: "2.2.0"    # pin to the same tag tested in staging
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -726,6 +1196,69 @@ watch kubectl get pods -n taskr
 
 ---
 
+## Canary Deployment Pattern
+
+Instead of a big-bang cutover, route a small percentage of traffic to the new k3s version while the Podman stack serves the majority. Increase traffic incrementally.
+
+```mermaid
+flowchart TD
+    subgraph Traefik
+        IR[IngressRoute\ntaskr.example.com]
+    end
+    IR -->|90% traffic| OLD[web-stable\nPodman stack\nvia NodePort]
+    IR -->|10% traffic| NEW[web-canary\nk3s Deployment\n1 replica]
+    NEW -->|promote| FULL[web-stable\nk3s Deployment\n2 replicas]
+```
+
+```yaml
+# canary-ingressroute.yaml — weighted traffic split with Traefik
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: taskr-canary
+  namespace: taskr
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`taskr.example.com`)
+    kind: Rule
+    services:
+    - name: web-stable
+      port: 80
+      weight: 90      # 90% of traffic to stable
+    - name: web-canary
+      port: 80
+      weight: 10      # 10% to canary
+    middlewares:
+    - name: security-headers
+  tls:
+    certResolver: letsencrypt
+```
+
+```bash
+# 1. Deploy canary (1 replica)
+kubectl apply -f canary-deployment.yaml   # image: ghcr.io/myorg/taskr-web:2.2.0
+
+# 2. Verify canary health
+kubectl rollout status deployment/web-canary -n taskr
+kubectl logs deployment/web-canary -n taskr --tail=50
+
+# 3. Monitor error rates for 30 min — then increase traffic
+# Edit the IngressRoute to weight: 50/50, then 0/100
+
+# 4. Promote: remove canary Service from IngressRoute and point fully to web-stable
+kubectl set image deployment/web-stable web=ghcr.io/myorg/taskr-web:2.2.0 -n taskr
+kubectl rollout status deployment/web-stable -n taskr
+
+# 5. Delete canary after promotion
+kubectl delete deployment web-canary -n taskr
+kubectl delete svc web-canary -n taskr
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
 ## Phase 7: Post-Migration Validation
 
 ```bash
@@ -778,6 +1311,68 @@ systemctl --user disable taskr-postgres.service taskr-redis.service
 [ ] Old Podman services stopped
 [ ] Backups of old volumes retained for 30 days
 [ ] Runbook updated with new k3s architecture
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Post-Migration Runbook Template
+
+Copy and fill this template into your team's wiki or ops repository after a successful migration:
+
+```markdown
+# Runbook: Taskr on k3s
+
+## Quick Reference
+- **Namespace:** taskr
+- **Cluster:** k3s-prod (kubectl context: k3s-prod)
+- **Registry:** ghcr.io/myorg
+- **Ingress:** taskr.example.com (Traefik IngressRoute)
+- **Manifests:** https://github.com/myorg/taskr/tree/main/k8s/
+
+## Health Check
+kubectl get pods -n taskr
+kubectl top pods -n taskr
+curl -sf https://taskr.example.com/healthz
+
+## Deploy New Version
+1. Push image: podman push ghcr.io/myorg/taskr-web:<new-tag>
+2. Update image tag in overlays/production/kustomization.yaml
+3. kubectl apply -k k8s/overlays/production
+4. kubectl rollout status deployment/web -n taskr
+
+## Rollback
+kubectl rollout undo deployment/web -n taskr
+kubectl rollout history deployment/web -n taskr
+
+## Database Access
+kubectl exec -n taskr statefulset/postgres -- psql -U taskr -d taskr
+
+## Restart a Component
+kubectl rollout restart deployment/web -n taskr
+kubectl rollout restart deployment/redis -n taskr
+kubectl rollout restart statefulset/postgres -n taskr
+
+## View Logs
+kubectl logs deployment/web -n taskr --tail=100 --follow
+kubectl logs statefulset/postgres -n taskr --tail=50
+
+## Scale Manually
+kubectl scale deployment/web --replicas=3 -n taskr
+
+## Backup Database
+kubectl exec -n taskr statefulset/postgres -- \
+  pg_dump -U taskr -d taskr -F c > /backup/taskr-$(date +%Y%m%d).pgdump
+
+## Secret Rotation
+kubectl delete secret taskr-secrets -n taskr
+# Update sealed secret, then:
+kubectl apply -f k8s/overlays/production/sealed-secret-prod.yaml
+
+## Emergency Contacts
+- On-call: @ops-team (PagerDuty)
+- Escalation: @platform-lead
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -848,6 +1443,40 @@ timeline
              : Archive old volume backups
              : Update runbook
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Common Pitfalls
+
+| Issue | Symptom | Fix |
+|---|---|---|
+| Migration Job runs again on redeploy | Duplicate data / schema errors | Use versioned Job names (`taskr-migrate-v2-2-0`) — immutable |
+| Rollback wipes migrated DB | Data from k3s session lost | Always restore from pre-migration backup, not live DB |
+| SealedSecret decryption fails after cluster rebuild | `secret not found` | Restore the sealed-secrets master key backup before applying |
+| NetworkPolicy blocks DNS | All pods: `CrashLoopBackOff`, `nslookup` fails | Add `allow-dns-egress` NetworkPolicy (port 53 UDP/TCP) |
+| Caddy → Traefik TLS gap | `ERR_CONNECTION_REFUSED` during cutover | Pre-issue cert with cert-manager before DNS flip |
+| `kubectl cp` fails for large dumps | Timeout or partial file | Use `kubectl exec ... pg_dump > /tmp/...` + `kubectl cp` in chunks |
+| Canary ingressroute weight not splitting | All traffic goes to stable | Traefik requires both services to be healthy; check canary pod readiness |
+| Quadlet `localhost` DB URL in env | `connection refused` — wrong hostname | Replace `localhost` with k8s Service DNS name (e.g., `postgres`) |
+| StatefulSet PVC not deleted on `kubectl delete ns` | PVC stuck in Terminating | PVCs have a finalizer — delete them explicitly: `kubectl delete pvc -n taskr --all` |
+| Job completes but `kubectl wait` times out | CI hangs | Add `--timeout` and check `kubectl describe job` for events |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Further Reading
+
+- [Kubernetes Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/) — one-shot and batch workloads
+- [CronJob reference](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/) — scheduled tasks
+- [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/) — pod-level network isolation
+- [SealedSecrets](https://github.com/bitnami-labs/sealed-secrets) — encrypted secrets for GitOps
+- [Kustomize overlays](https://kubectl.docs.kubernetes.io/references/kustomize/kustomizationref/) — multi-environment promotion
+- [Traefik weighted services](https://doc.traefik.io/traefik/routing/services/#weighted-round-robin) — canary traffic splitting
+- [k3s local-path-provisioner](https://github.com/rancher/local-path-provisioner) — PVC storage class
+- [pg_dump / pg_restore](https://www.postgresql.org/docs/current/app-pgdump.html) — PostgreSQL backup and restore
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

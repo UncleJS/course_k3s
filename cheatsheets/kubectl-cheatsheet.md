@@ -2,6 +2,27 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Cluster Info](#cluster-info)
+- [Contexts](#contexts)
+- [Nodes](#nodes)
+- [Pods](#pods)
+- [Deployments](#deployments)
+- [Services](#services)
+- [ConfigMaps & Secrets](#configmaps--secrets)
+- [Namespaces](#namespaces)
+- [Labels & Selectors](#labels--selectors)
+- [Resource Management](#resource-management)
+- [Port-Forward](#port-forward)
+- [Copy Files](#copy-files)
+- [Events](#events)
+- [RBAC Quick Checks](#rbac-quick-checks)
+- [Output Formats](#output-formats)
+- [Useful Aliases](#useful-aliases)
+
+---
+
 ## Cluster Info
 
 | Command | Description |
@@ -13,6 +34,8 @@
 | `kubectl api-versions` | All available API versions |
 | `kubectl explain pod.spec.containers` | Field docs for any resource |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Contexts
 
 | Command | Description |
@@ -23,6 +46,8 @@
 | `kubectl config set-context --current --namespace=<ns>` | Set default namespace |
 | `kubectl config view --minify` | Show current context config |
 | `kubectl config delete-context <name>` | Remove a context |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Nodes
 
@@ -37,6 +62,8 @@
 | `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data` | Evict all pods |
 | `kubectl taint nodes <node> key=val:NoSchedule` | Add taint |
 | `kubectl taint nodes <node> key:NoSchedule-` | Remove taint |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Pods
 
@@ -82,6 +109,8 @@
 | `kubectl delete pods --all` | Delete all pods in namespace |
 | `kubectl delete pods -l app=myapp` | Delete by label |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Deployments
 
 | Command | Description |
@@ -97,6 +126,8 @@
 | `kubectl set image deploy/<name> app=image:tag` | Update container image |
 | `kubectl autoscale deploy/<name> --min=2 --max=10 --cpu-percent=80` | Create HPA |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Services
 
 | Command | Description |
@@ -107,6 +138,8 @@
 | `kubectl get endpoints <name>` | Show backing pod IPs |
 | `kubectl expose deploy/<name> --port=80 --target-port=8080` | Expose deployment |
 | `kubectl delete svc <name>` | Delete service |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## ConfigMaps & Secrets
 
@@ -122,6 +155,8 @@
 | `kubectl create secret docker-registry <name> --docker-server=... --docker-username=... --docker-password=...` | Registry pull secret |
 | `kubectl get secret <name> -o jsonpath='{.data.password}' \| base64 -d` | Decode secret value |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Namespaces
 
 | Command | Description |
@@ -131,6 +166,8 @@
 | `kubectl delete ns <name>` | Delete namespace and all resources |
 | `kubectl get all -n <name>` | All resources in namespace |
 | `kubectl -n <name> <command>` | Run command in namespace |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Labels & Selectors
 
@@ -142,6 +179,8 @@
 | `kubectl label pod <name> env=prod` | Add/update label |
 | `kubectl label pod <name> env-` | Remove label |
 | `kubectl annotate pod <name> note="test"` | Add annotation |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Resource Management
 
@@ -169,6 +208,8 @@
 | `kubectl top pod --containers` | Per-container usage |
 | `kubectl top pod -l app=myapp` | Usage by label |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Port-Forward
 
 ```bash
@@ -185,6 +226,8 @@ kubectl port-forward svc/<name> 8080:80
 kubectl port-forward svc/<name> 8080:80 --address=0.0.0.0
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Copy Files
 
 ```bash
@@ -198,6 +241,8 @@ kubectl cp <pod>:/remote/path /local/path
 kubectl cp <pod>:/path /local/path -c <container>
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Events
 
 | Command | Description |
@@ -207,6 +252,8 @@ kubectl cp <pod>:/path /local/path -c <container>
 | `kubectl get events --sort-by=.lastTimestamp` | Sort by time |
 | `kubectl get events --field-selector=type=Warning` | Warnings only |
 | `kubectl get events --field-selector=involvedObject.name=<pod>` | Events for specific pod |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## RBAC Quick Checks
 
@@ -224,6 +271,8 @@ kubectl auth whoami
 kubectl auth can-i --list
 kubectl auth can-i --list -n kube-system
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Output Formats
 
@@ -248,6 +297,8 @@ kubectl get pods -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,IP:.
 # Get all image names
 kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{"\n"}{end}' | sort -u
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Useful Aliases
 
@@ -279,6 +330,8 @@ alias watchpods='watch kubectl get pods'
 # Kubecolor for colorized output
 # alias kubectl='kubecolor'
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

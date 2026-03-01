@@ -31,6 +31,7 @@
 | 14 | [Maintenance](#module-14--maintenance) | 🟡 Intermediate | 3 |
 | 15 | [Troubleshooting](#module-15--troubleshooting) | 🟡–🔴 All Levels | 5 |
 | 16 | [Moving from Podman to k3s](#module-16--moving-from-podman-to-k3s) | 🟢–🟡 Beginner/Intermediate | 4 |
+| 17 | [Moving from Docker to k3s](#module-17--moving-from-docker-to-k3s) | 🟢–🟡 Beginner/Intermediate | 5 |
 
 ### 📋 Cheatsheets
 
@@ -81,11 +82,14 @@ flowchart TD
     R --> S([🎓 Certified k3s Expert])
     B -.->|Coming from Podman?| T[16 Podman → k3s]
     T -.-> E
+    B -.->|Coming from Docker?| U[17 Docker → k3s]
+    U -.-> E
 
     style A fill:#22c55e,color:#fff
     style S fill:#6366f1,color:#fff
     style K fill:#f59e0b,color:#fff
     style T fill:#0ea5e9,color:#fff
+    style U fill:#0ea5e9,color:#fff
 ```
 
 ---
@@ -311,6 +315,21 @@ flowchart TD
 | 03 | [Images and Registries](16_podman_to_k3s/03_images_and_registries.md) |
 | 04 | [Full Migration Walkthrough](16_podman_to_k3s/04_migration_walkthrough.md) |
 | Labs | [podman-compose-example.yml](16_podman_to_k3s/labs/podman-compose-example.yml) · [compose-to-k3s.yaml](16_podman_to_k3s/labs/compose-to-k3s.yaml) |
+
+---
+
+## Module 17 — Moving from Docker to k3s
+
+> 🟢–🟡 Beginner/Intermediate · For developers already using Docker or Docker Compose
+
+| Lesson | File |
+|--------|------|
+| 01 | [Mental Model Shift: Docker Daemon vs Daemonless](17_docker_to_k3s/01_mental_model_shift.md) |
+| 02 | [Translating Docker Compose to Kubernetes Manifests](17_docker_to_k3s/02_compose_to_k3s.md) |
+| 03 | [Images and Registries](17_docker_to_k3s/03_images_and_registries.md) |
+| 04 | [Docker Gotchas When Moving to k3s](17_docker_to_k3s/04_docker_gotchas.md) |
+| 05 | [Full Migration Walkthrough](17_docker_to_k3s/05_migration_walkthrough.md) |
+| Labs | [docker-compose-example.yml](17_docker_to_k3s/labs/docker-compose-example.yml) · [docker-compose-to-k3s.yaml](17_docker_to_k3s/labs/docker-compose-to-k3s.yaml) |
 
 ---
 

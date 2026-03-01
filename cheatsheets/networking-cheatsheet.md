@@ -2,6 +2,20 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Service Types Reference](#service-types-reference)
+- [kubectl for Services & Endpoints](#kubectl-for-services--endpoints)
+- [Port-Forward Patterns](#port-forward-patterns)
+- [Flannel / CNI Status](#flannel--cni-status)
+- [DNS Testing](#dns-testing)
+- [Traefik IngressRoute Templates](#traefik-ingressroute-templates)
+- [NetworkPolicy Templates](#networkpolicy-templates)
+- [Netshoot One-liners](#netshoot-one-liners)
+- [iptables Inspection](#iptables-inspection)
+
+---
+
 ## Service Types Reference
 
 | Type | Cluster Access | External Access | Use Case |
@@ -11,6 +25,8 @@
 | `LoadBalancer` | Yes | Yes (external IP via cloud or Klipper) | Production external access |
 | `ExternalName` | Yes (CNAME) | No | Alias to external DNS name |
 | `Headless` (`clusterIP: None`) | Yes (DNS → pod IPs) | No | StatefulSets, direct pod addressing |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## kubectl for Services & Endpoints
 
@@ -38,6 +54,8 @@ kubectl get svc <name> -o jsonpath='{.spec.ports[0].nodePort}'
 # Watch service external IP assignment
 kubectl get svc <name> -w
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Port-Forward Patterns
 
@@ -67,6 +85,8 @@ kubectl port-forward svc/argocd-server 8080:443 -n argocd
 kubectl port-forward svc/longhorn-frontend 8000:80 -n longhorn-system
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Flannel / CNI Status
 
 ```bash
@@ -91,6 +111,8 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.pod
 # Flannel backend in use
 kubectl get cm -n kube-flannel kube-flannel-cfg -o jsonpath='{.data.net-conf\.json}' | python3 -m json.tool
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## DNS Testing
 
@@ -119,6 +141,8 @@ kubectl get cm -n kube-system coredns -o yaml
 # <service>.<namespace>.svc              (explicit svc)
 # <service>.<namespace>.svc.cluster.local  (FQDN)
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Traefik IngressRoute Templates
 
@@ -202,6 +226,8 @@ spec:
       secretName: app-tls-secret
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## NetworkPolicy Templates
 
 ```yaml
@@ -276,6 +302,8 @@ spec:
           port: 53
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Netshoot One-liners
 
 ```bash
@@ -311,6 +339,8 @@ kubectl run netshoot --image=nicolaka/netshoot -it --rm \
   --overrides='{"spec":{"serviceAccountName":"mysa"}}'
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## iptables Inspection
 
 ```bash
@@ -343,6 +373,8 @@ sudo ss -s
 # Show all active connections
 sudo ss -tnp
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

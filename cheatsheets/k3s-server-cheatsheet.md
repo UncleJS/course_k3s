@@ -2,6 +2,22 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Install Commands](#install-commands)
+- [k3s CLI Reference](#k3s-cli-reference)
+- [Service Management](#service-management)
+- [Config & File Locations](#config--file-locations)
+- [Server Flags Quick Reference](#server-flags-quick-reference)
+- [Config File Format](#config-file-format)
+- [Token Operations](#token-operations)
+- [etcd-snapshot Commands](#etcd-snapshot-commands)
+- [Private Registry Config](#private-registry-config)
+- [Useful k3s One-liners](#useful-k3s-one-liners)
+- [Uninstall](#uninstall)
+
+---
+
 ## Install Commands
 
 ### Online Install
@@ -45,6 +61,8 @@ sudo cp k3s /usr/local/bin/k3s && sudo chmod +x /usr/local/bin/k3s
 INSTALL_K3S_SKIP_DOWNLOAD=true sh install.sh
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## k3s CLI Reference
 
 | Command | Description |
@@ -87,6 +105,8 @@ k3s ctr tasks ls                     # List running tasks
 k3s ctr namespaces ls                # List namespaces (k8s.io is default)
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Service Management
 
 | Command | Description |
@@ -101,6 +121,8 @@ k3s ctr namespaces ls                # List namespaces (k8s.io is default)
 | `journalctl -u k3s --since "1 hour ago"` | Recent logs |
 | `systemctl status k3s-agent` | Agent service status |
 | `journalctl -u k3s-agent -f` | Follow agent logs |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Config & File Locations
 
@@ -125,6 +147,8 @@ k3s ctr namespaces ls                # List namespaces (k8s.io is default)
 | `/etc/systemd/system/k3s-agent.service` | Systemd unit (agent) |
 | `/var/lib/rancher/k3s/server/manifests/` | Auto-deploy manifests |
 | `/var/lib/rancher/k3s/server/static/` | Static file serving |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Server Flags Quick Reference
 
@@ -187,6 +211,8 @@ k3s ctr namespaces ls                # List namespaces (k8s.io is default)
 | `--kube-scheduler-arg=<arg>` | Pass arg to scheduler |
 | `--protect-kernel-defaults` | Fail if kernel params differ from kubelet defaults |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Config File Format
 
 ```yaml
@@ -206,6 +232,8 @@ node-label:
   - "node-type=server"
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Token Operations
 
 ```bash
@@ -221,6 +249,8 @@ k3s token rotate --new-token=<new-token>
 # List tokens
 k3s token list
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## etcd-snapshot Commands
 
@@ -246,6 +276,8 @@ systemctl start k3s
 # etcd-snapshot-dir: /opt/k3s-snapshots
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Private Registry Config
 
 ```yaml
@@ -262,6 +294,8 @@ configs:
     tls:
       ca_file: /etc/ssl/certs/registry-ca.crt
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Useful k3s One-liners
 
@@ -300,6 +334,8 @@ k3s crictl images | sort
 k3s ctr images import myimage.tar
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Uninstall
 
 ```bash
@@ -316,6 +352,8 @@ rm -f /etc/systemd/system/k3s*.service
 rm -rf /etc/rancher /var/lib/rancher /var/lib/kubelet
 systemctl daemon-reload
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

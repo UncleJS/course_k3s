@@ -2,6 +2,24 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Install Helm](#install-helm)
+- [Repo Operations](#repo-operations)
+- [Search](#search)
+- [Install](#install)
+- [Upgrade](#upgrade)
+- [Rollback](#rollback)
+- [Uninstall](#uninstall)
+- [Inspect Release](#inspect-release)
+- [Template / Lint / Package](#template--lint--package)
+- [OCI Registries](#oci-registries)
+- [--set Syntax Examples](#--set-syntax-examples)
+- [Useful Flags Reference](#useful-flags-reference)
+- [HelmChart CRD (k3s Built-in)](#helmchart-crd-k3s-built-in)
+
+---
+
 ## Install Helm
 
 ```bash
@@ -24,6 +42,8 @@ apt install helm            # Debian (after adding repo)
 # Verify
 helm version
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Repo Operations
 
@@ -48,6 +68,8 @@ helm repo add argo https://argoproj.github.io/argo-helm
 helm repo add flux2 https://fluxcd-community.github.io/helm-charts
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Search
 
 | Command | Description |
@@ -59,6 +81,8 @@ helm repo add flux2 https://fluxcd-community.github.io/helm-charts
 | `helm show values <repo>/<chart>` | Show default values |
 | `helm show readme <repo>/<chart>` | Show README |
 | `helm show all <repo>/<chart>` | Show everything |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Install
 
@@ -94,6 +118,8 @@ helm install my-nginx bitnami/nginx --wait --timeout=5m
 helm install my-nginx bitnami/nginx --atomic --timeout=5m
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Upgrade
 
 ```bash
@@ -120,6 +146,8 @@ helm upgrade my-nginx bitnami/nginx --force
 helm upgrade my-nginx bitnami/nginx --cleanup-on-fail
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Rollback
 
 ```bash
@@ -137,6 +165,8 @@ helm rollback my-nginx --wait
 helm history my-nginx
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Uninstall
 
 ```bash
@@ -150,6 +180,8 @@ helm uninstall my-nginx --keep-history
 # Uninstall from specific namespace
 helm uninstall my-nginx -n ingress
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Inspect Release
 
@@ -165,6 +197,8 @@ helm uninstall my-nginx -n ingress
 | `helm get hooks <release>` | Release hooks |
 | `helm get notes <release>` | Post-install notes |
 | `helm history <release>` | Revision history |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Template / Lint / Package
 
@@ -189,6 +223,8 @@ helm package ./my-chart/ --version 1.2.3 --app-version 2.0.0
 helm create my-chart
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## OCI Registries
 
 ```bash
@@ -211,6 +247,8 @@ helm show chart oci://registry.example.com/charts/my-chart --version 1.0.0
 helm registry logout registry.example.com
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## --set Syntax Examples
 
 | Syntax | YAML Equivalent |
@@ -224,6 +262,8 @@ helm registry logout registry.example.com
 | `--set-string num=42` | Force string type |
 | `--set-file key=./file.txt` | Read value from file |
 | `--set-json key='{"a":1}'` | Parse as JSON |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Useful Flags Reference
 
@@ -244,6 +284,8 @@ helm registry logout registry.example.com
 | `-n, --namespace` | Target namespace |
 | `--create-namespace` | Create namespace if not present |
 | `--kube-context` | Use specific kubeconfig context |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## HelmChart CRD (k3s Built-in)
 
@@ -294,6 +336,9 @@ spec:
 | `spec.jobImage` | Image for helm job pod |
 | `spec.helmVersion` | `v3` (default) |
 | `spec.authSecret` | Secret for private repos |
+| `spec.helmVersion` | `v3` (default) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

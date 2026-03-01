@@ -2,6 +2,20 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Prometheus Stack Install](#prometheus-stack-install)
+- [Key PromQL Queries](#key-promql-queries)
+- [kubectl for Monitoring Resources](#kubectl-for-monitoring-resources)
+- [Grafana Access](#grafana-access)
+- [PrometheusRule Template](#prometheusrule-template)
+- [Alertmanager Receiver Templates](#alertmanager-receiver-templates)
+- [Silence Management](#silence-management)
+- [ServiceMonitor Template](#servicemonitor-template)
+- [Alert Testing](#alert-testing)
+
+---
+
 ## Prometheus Stack Install
 
 ```bash
@@ -30,6 +44,8 @@ helm upgrade prometheus prometheus-community/kube-prometheus-stack \
 # Check CRDs installed
 kubectl get crd | grep monitoring.coreos.com
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Key PromQL Queries
 
@@ -83,6 +99,8 @@ rate(node_network_transmit_bytes_total{device!="lo"}[5m])
 etcd_server_has_leader == 1
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## kubectl for Monitoring Resources
 
 ```bash
@@ -122,6 +140,8 @@ kubectl exec -n monitoring deploy/prometheus-kube-prometheus-prometheus \
   -- wget -qO- localhost:9090/api/v1/targets | python3 -m json.tool | head -50
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Grafana Access
 
 ```bash
@@ -160,6 +180,8 @@ spec:
                   number: 80
 EOF
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## PrometheusRule Template
 
@@ -201,6 +223,8 @@ spec:
           annotations:
             summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Alertmanager Receiver Templates
 
@@ -258,6 +282,8 @@ spec:
             subject: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Silence Management
 
 ```bash
@@ -289,6 +315,8 @@ curl -X POST http://localhost:9093/api/v2/silences \
   }'
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## ServiceMonitor Template
 
 ```yaml
@@ -310,6 +338,8 @@ spec:
       interval: 30s
       scrapeTimeout: 10s
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Alert Testing
 
@@ -333,6 +363,8 @@ curl -H "Content-Type: application/json" \
   -d '[{"labels":{"alertname":"TestAlert","severity":"warning","instance":"test"},"annotations":{"summary":"Test alert"}}]' \
   http://localhost:9093/api/v2/alerts
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

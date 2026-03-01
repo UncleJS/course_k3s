@@ -2,6 +2,18 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [etcd-snapshot Commands](#etcd-snapshot-commands)
+- [Scheduled Snapshots (config.yaml)](#scheduled-snapshots-configyaml)
+- [SQLite Backup Commands](#sqlite-backup-commands)
+- [Velero CLI](#velero-cli)
+- [Velero YAML Snippets](#velero-yaml-snippets)
+- [Pre-Upgrade Backup Checklist](#pre-upgrade-backup-checklist)
+- [Post-Restore Verification Commands](#post-restore-verification-commands)
+
+---
+
 ## etcd-snapshot Commands
 
 ### On-Demand Snapshots
@@ -90,6 +102,8 @@ sudo k3s server \
 sudo systemctl start k3s
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Scheduled Snapshots (config.yaml)
 
 ```yaml
@@ -108,6 +122,8 @@ etcd-s3-secret-key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 etcd-s3-bucket: my-k3s-backups
 etcd-s3-region: us-east-1
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## SQLite Backup Commands
 
@@ -140,6 +156,8 @@ sudo cp /opt/backups/k3s-state-<timestamp>.db \
   /var/lib/rancher/k3s/server/db/state.db
 sudo systemctl start k3s
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Velero CLI
 
@@ -282,6 +300,8 @@ velero schedule unpause <name>
 velero schedule delete <name>
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Velero YAML Snippets
 
 ### Backup
@@ -373,6 +393,8 @@ spec:
     key: cloud
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Pre-Upgrade Backup Checklist
 
 ```bash
@@ -407,6 +429,8 @@ sudo k3s etcd-snapshot list
 # 9. Copy snapshot off-node
 sudo rsync -av /var/lib/rancher/k3s/server/db/snapshots/ backup-server:/backups/k3s/
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Post-Restore Verification Commands
 
@@ -459,6 +483,8 @@ curl -f https://app.example.com/healthz
 velero backup-location get
 velero backup get | head -5
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

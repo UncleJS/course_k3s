@@ -2,6 +2,18 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [StorageClass Operations](#storageclass-operations)
+- [PV / PVC Lifecycle](#pv--pvc-lifecycle)
+- [Dynamic Provisioning Templates](#dynamic-provisioning-templates)
+- [PVC Resize Procedure](#pvc-resize-procedure)
+- [Volume Debug Commands](#volume-debug-commands)
+- [Longhorn Quick Reference](#longhorn-quick-reference)
+- [Common PVC Issues](#common-pvc-issues)
+
+---
+
 ## StorageClass Operations
 
 ```bash
@@ -37,6 +49,8 @@ provisioner: rancher.io/local-path
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## PV / PVC Lifecycle
 
@@ -92,6 +106,8 @@ kubectl delete pv <name>
 # Change PV reclaim policy
 kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Dynamic Provisioning Templates
 
@@ -184,6 +200,8 @@ spec:
       storage: 10Gi
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## PVC Resize Procedure
 
 ```bash
@@ -203,6 +221,8 @@ kubectl rollout restart deploy/<name>
 # Enable expansion on existing StorageClass
 kubectl patch sc longhorn -p '{"allowVolumeExpansion": true}'
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Volume Debug Commands
 
@@ -233,6 +253,8 @@ ls /var/lib/rancher/k3s/storage/
 # Check if PV directory exists on node
 sudo ls -la /var/lib/rancher/k3s/storage/pvc-<uuid>
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Longhorn Quick Reference
 
@@ -335,6 +357,8 @@ spec:
 EOF
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Common PVC Issues
 
 | Symptom | Likely Cause | Fix |
@@ -349,6 +373,8 @@ EOF
 | Read-only filesystem | App writing to RO mount | Check `readOnlyRootFilesystem` in SecurityContext |
 | `AccessModes` mismatch | RWX requested, RWO provided | Use Longhorn or NFS-based StorageClass |
 | Data lost after pod restart | Using `emptyDir` not PVC | Use PersistentVolumeClaim for persistence |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

@@ -1,0 +1,766 @@
+# Taskr — Full k3s manifest translation of docker-compose-example.yml
+# Used by: Module 17 Lesson 02 (Compose translation) and Lesson 05 (Migration walkthrough)
+#
+# Translation mapping (Docker Compose → k3s):
+#
+#  services.web          → Deployment/taskr-web + Service/taskr-web
+#  services.db           → StatefulSet/postgres + Service/postgres (headless)
+#  services.cache        → Deployment/redis + Service/redis
+#  services.proxy        → Deployment/nginx-proxy + Service/nginx-proxy
+#  services.migrate      → Job/taskr-db-migrate
+#  services.adminer      → Deployment/adminer + Service/adminer (dev overlay only)
+#
+#  volumes.pgdata        → PersistentVolumeClaim/pgdata (via StatefulSet volumeClaimTemplate)
+#  volumes.redis_data    → PersistentVolumeClaim/redis-data
+#  volumes.nginx_logs    → emptyDir (logs don't need persistence)
+#
+#  secrets.*             → Secret/taskr-secrets (use SealedSecret in production)
+#  configs.nginx_config  → ConfigMap/nginx-config
+#
+#  networks.backend      → NetworkPolicy (deny external, allow web→db, web→redis)
+#  networks.frontend     → (Flannel handles pod networking; Ingress handles external)
+#
+#  deploy.replicas       → spec.replicas
+#  deploy.resources      → resources.requests + resources.limits
+#  deploy.update_config  → strategy.rollingUpdate
+#  deploy.placement      → nodeSelector (if needed)
+#
+#  depends_on conditions → initContainers
+#  profiles: production  → base manifests (applied by default)
+#  profiles: dev         → separate overlay / not included here
+#  profiles: migration   → Job (apply manually before or during deploy)
+#
+# Apply: kubectl apply -f docker-compose-to-k3s.yaml -n taskr
+# Note: create namespace and secrets first (see Lesson 05 Phase 3)
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# NAMESPACE
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taskr
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# SECRETS
+# ⚠️  Do NOT commit plain Secrets to git.
+#     In production, replace with SealedSecret (see Lesson 05 Phase 3).
+#     stringData values here are placeholders — change before applying.
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Secret
+metadata:
+  name: taskr-secrets
+  namespace: taskr
+type: Opaque
+stringData:
+  # Docker Compose: secrets.postgres_password (file: ./secrets/postgres_password.txt)
+  postgres-password: "CHANGE_ME_strong_password_here"
+  # Docker Compose: secrets.redis_password
+  redis-password: "CHANGE_ME_redis_password_here"
+  # Docker Compose: secrets.app_secret_key
+  app-secret-key: "CHANGE_ME_32_char_secret_key_here"
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# CONFIGMAP — app config
+# Docker Compose: environment: (non-secret keys from services.web)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taskr-config
+  namespace: taskr
+data:
+  # These came from environment: in docker-compose-example.yml
+  NODE_ENV: "production"
+  PORT: "3000"
+  DATABASE_HOST: "postgres"          # Compose: DATABASE_HOST: db  → k3s Service name
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "taskr"
+  DATABASE_USER: "taskr"
+  REDIS_HOST: "redis"                # Compose: REDIS_HOST: cache  → k3s Service name
+  REDIS_PORT: "6379"
+  LOG_LEVEL: "info"
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# CONFIGMAP — nginx config
+# Docker Compose: configs.nginx_config (file: ./config/nginx.conf)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: taskr
+data:
+  default.conf: |
+    upstream taskr_web {
+        server taskr-web:3000;
+    }
+    server {
+        listen 80;
+        server_name _;
+
+        location / {
+            proxy_pass http://taskr_web;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /health {
+            proxy_pass http://taskr_web/health;
+        }
+    }
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# SERVICEACCOUNT
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: taskr-web
+  namespace: taskr
+imagePullSecrets:
+  - name: ghcr-pull   # create this separately: kubectl create secret docker-registry ghcr-pull ...
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# POSTGRESQL — StatefulSet
+# Docker Compose: services.db (image: postgres:16-alpine, volume: pgdata)
+#
+# Key translations:
+#   restart: unless-stopped  → restartPolicy: Always (default in StatefulSet)
+#   healthcheck (pg_isready) → livenessProbe + readinessProbe
+#   secrets.postgres_password (file) → env var from Secret (POSTGRES_PASSWORD)
+#   volumes.pgdata           → volumeClaimTemplate (local-path StorageClass)
+#   deploy.resources.limits  → resources.limits
+#   deploy.resources.reservations → resources.requests
+#   deploy.placement (manager) → (removed; single-node k3s has one node)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: taskr
+  labels:
+    app: postgres
+    app.kubernetes.io/component: database
+spec:
+  serviceName: postgres   # headless Service name for stable DNS
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        runAsUser: 999    # postgres image uses uid 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: taskr
+            - name: POSTGRES_USER
+              value: taskr
+            # Docker Compose used POSTGRES_PASSWORD_FILE pointing to a secret file.
+            # k3s uses env var from Secret — functionally equivalent.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          # Docker Compose healthcheck: pg_isready → k3s livenessProbe + readinessProbe
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "taskr", "-d", "taskr"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "taskr", "-d", "taskr"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          resources:
+            # Docker Compose deploy.resources.reservations → requests
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            # Docker Compose deploy.resources.limits → limits
+            limits:
+              cpu: "1"
+              memory: 1Gi
+  # Docker Compose: volumes.pgdata (named volume)
+  # k3s: PVC via volumeClaimTemplate — local-path StorageClass
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        storageClassName: local-path   # k3s default; Kompose output needs this added
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+# PostgreSQL Service (headless — stable DNS for StatefulSet)
+# StatefulSet Pod DNS: postgres-0.postgres.taskr.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: taskr
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  clusterIP: None   # headless
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# REDIS — Deployment + PVC
+# Docker Compose: services.cache (image: redis:7-alpine, volume: redis_data)
+#
+# Key translations:
+#   command: redis-server --requirepass ...  → command with env var expansion
+#   secrets.redis_password (file)           → env var from Secret
+#   volumes.redis_data                      → PVC (local-path)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: taskr
+  labels:
+    app: redis
+    app.kubernetes.io/component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # Docker Compose: command with shell-expanded secret file → env var approach
+          command:
+            - redis-server
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --appendonly
+            - "yes"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: redis-password
+          ports:
+            - containerPort: 6379
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: taskr
+spec:
+  storageClassName: local-path
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: taskr
+  labels:
+    app: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# WEB — Deployment
+# Docker Compose: services.web (build: + image:, depends_on conditions)
+#
+# Key translations:
+#   build:                  → pre-built image from registry (no build: in k3s)
+#   restart: unless-stopped → restartPolicy: Always (default in Deployment)
+#   depends_on (service_healthy) → initContainers
+#   secrets (file mounts)   → env vars from Secret
+#   deploy.replicas: 2      → spec.replicas: 2
+#   deploy.update_config    → strategy.rollingUpdate
+#   deploy.resources        → resources.requests + limits
+#   profiles: production    → applied by default (no profile filtering in k8s)
+#   healthcheck             → livenessProbe + readinessProbe
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskr-web
+  namespace: taskr
+  labels:
+    app: taskr-web
+    app.kubernetes.io/component: web
+spec:
+  # Docker Compose: deploy.replicas: 2
+  replicas: 2
+  selector:
+    matchLabels:
+      app: taskr-web
+  # Docker Compose: deploy.update_config (parallelism: 1, failure_action: rollback)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # parallelism: 1
+      maxUnavailable: 0    # failure_action: rollback equivalent — never remove old Pod before new is ready
+  template:
+    metadata:
+      labels:
+        app: taskr-web
+    spec:
+      serviceAccountName: taskr-web
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      # Docker Compose: depends_on.db (condition: service_healthy)
+      # → initContainer that waits for postgres readiness
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U taskr; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready"
+        # Docker Compose: depends_on.cache (condition: service_started)
+        # → initContainer that pings Redis
+        - name: wait-for-redis
+          image: redis:7-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis -a "$REDIS_PASSWORD" ping | grep -q PONG; do
+                echo "Waiting for Redis..."
+                sleep 2
+              done
+              echo "Redis is ready"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: redis-password
+      containers:
+        - name: web
+          # Docker Compose: image: ghcr.io/myorg/taskr-web:1.0.0
+          # build: is handled separately by CI/CD (docker buildx push)
+          image: ghcr.io/myorg/taskr-web:1.0.0
+          imagePullPolicy: IfNotPresent
+          # Docker Compose: environment: (non-secret keys)
+          envFrom:
+            - configMapRef:
+                name: taskr-config
+          # Docker Compose: secrets (file-mounted) → env vars from Secret
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: redis-password
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: app-secret-key
+          ports:
+            - containerPort: 3000
+          # Docker Compose: healthcheck (wget /health)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # Docker Compose: deploy.resources
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskr-web
+  namespace: taskr
+  labels:
+    app: taskr-web
+spec:
+  selector:
+    app: taskr-web
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# NGINX REVERSE PROXY — Deployment
+# Docker Compose: services.proxy (image: nginx, ports: 80/443, configs: nginx_config)
+#
+# Note: In k3s, Traefik Ingress is the preferred alternative to a separate Nginx proxy.
+# This Nginx Deployment is included for direct translation completeness.
+# The Ingress resource below uses Traefik directly (recommended approach).
+#
+# Key translations:
+#   ports: ["80:80", "443:443"] → Service (NodePort) or Ingress
+#   configs.nginx_config        → ConfigMap volume mount
+#   volumes.nginx_logs (named)  → emptyDir (logs don't need persistence)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy
+  namespace: taskr
+  labels:
+    app: nginx-proxy
+    app.kubernetes.io/component: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          # Docker Compose: configs.nginx_config → ConfigMap volume
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            # Docker Compose: volumes.nginx_logs (named) → emptyDir
+            # Named volumes for logs don't need persistence across Pod restarts
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        # Docker Compose: configs.nginx_config (file: ./config/nginx.conf)
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+        # Docker Compose: volumes.nginx_logs (named volume → emptyDir)
+        - name: nginx-logs
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy
+  namespace: taskr
+  labels:
+    app: nginx-proxy
+spec:
+  selector:
+    app: nginx-proxy
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# INGRESS — Traefik (recommended over standalone Nginx proxy)
+# Docker Compose: services.proxy ports 80/443 → Traefik Ingress
+# This is the k3s-native way to expose the app externally.
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: taskr-web
+  namespace: taskr
+  annotations:
+    # Use Traefik (k3s default ingress controller)
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Uncomment for automatic Let's Encrypt TLS:
+    # traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: taskr.example.com   # change to your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: taskr-web   # bypass nginx-proxy; go direct to web Pods
+                port:
+                  number: 3000
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# DATABASE MIGRATION JOB
+# Docker Compose: services.migrate (profiles: migration, restart: "no")
+#
+# Key translations:
+#   profiles: migration → Job (apply manually)
+#   restart: "no"       → restartPolicy: OnFailure with backoffLimit: 3
+#   depends_on.db       → initContainer
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: taskr-db-migrate-v1-0-0
+  namespace: taskr
+  labels:
+    app: taskr-migrate
+    app.kubernetes.io/component: migration
+spec:
+  # Docker Compose: restart: "no" — don't retry indefinitely
+  backoffLimit: 3
+  # Auto-cleanup after 1 hour
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      # Docker Compose: restart: "no" → OnFailure (retry on error, stop on success)
+      restartPolicy: OnFailure
+      # Docker Compose: depends_on.db (condition: service_healthy) → initContainer
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -p 5432 -U taskr; do sleep 2; done
+      containers:
+        - name: migrate
+          # Same image as web — uses node scripts/migrate.js
+          image: ghcr.io/myorg/taskr-web:1.0.0
+          command: ["node", "scripts/migrate.js"]
+          envFrom:
+            - configMapRef:
+                name: taskr-config
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-password
+
+---
+# ═══════════════════════════════════════════════════════════════════
+# NETWORK POLICIES
+# Docker Compose: networks.backend (internal: true) → NetworkPolicy
+#
+# The 'internal: true' bridge network in Docker prevents backend containers
+# from being directly accessible from outside Docker. In k3s we model this
+# with NetworkPolicy rules.
+# ═══════════════════════════════════════════════════════════════════
+
+# Default deny-all in namespace (equivalent to no exposed ports on backend network)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: taskr
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    # Allow DNS resolution (always required)
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+---
+# Allow web → postgres (Docker: services on backend network can reach each other)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-postgres
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: taskr-web
+        - podSelector:
+            matchLabels:
+              app: taskr-migrate   # migration Job also needs DB access
+      ports:
+        - port: 5432
+
+---
+# Allow web → redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-redis
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: taskr-web
+      ports:
+        - port: 6379
+
+---
+# Allow nginx-proxy → web (frontend network in Docker)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-proxy-to-web
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: taskr-web
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nginx-proxy
+      ports:
+        - port: 3000
+    # Also allow Traefik Ingress controller to reach web Pods directly
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - port: 3000
+
+---
+# Allow web Pods to reach the internet (for external API calls, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-egress-internet
+  namespace: taskr
+spec:
+  podSelector:
+    matchLabels:
+      app: taskr-web
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # allow all egress from web Pods (unrestricted outbound)

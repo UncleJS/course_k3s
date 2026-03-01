@@ -2,6 +2,21 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [RBAC Commands](#rbac-commands)
+- [Role & ClusterRole Templates](#role--clusterrole-templates)
+- [ServiceAccount Operations](#serviceaccount-operations)
+- [Secrets](#secrets)
+- [Pod Security Standards](#pod-security-standards)
+- [SecurityContext Template](#securitycontext-template)
+- [NetworkPolicy Templates](#networkpolicy-templates)
+- [Sealed Secrets Workflow](#sealed-secrets-workflow)
+- [Image Scanning (Trivy)](#image-scanning-trivy)
+- [CIS Compliance (kube-bench)](#cis-compliance-kube-bench)
+
+---
+
 ## RBAC Commands
 
 ```bash
@@ -48,6 +63,8 @@ kubectl auth can-i --list -n production
 # Who am I?
 kubectl auth whoami
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Role & ClusterRole Templates
 
@@ -115,6 +132,8 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## ServiceAccount Operations
 
 ```bash
@@ -150,6 +169,8 @@ kubectl create clusterrolebinding my-sa-binding \
   --serviceaccount=default:my-service-account
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Secrets
 
 ```bash
@@ -184,6 +205,8 @@ kubectl edit secret db-creds
 echo -n 'newsecret' | base64
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Pod Security Standards
 
 Labels applied to **namespaces** to enforce security levels:
@@ -213,6 +236,8 @@ kubectl get ns production --show-labels
 # Remove PSS label
 kubectl label ns production pod-security.kubernetes.io/enforce-
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## SecurityContext Template
 
@@ -252,6 +277,8 @@ spec:
       emptyDir: {}
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## NetworkPolicy Templates
 
 ```yaml
@@ -280,6 +307,8 @@ spec:
     - from:
         - podSelector: {}
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ## Sealed Secrets Workflow
 
@@ -317,6 +346,8 @@ kubectl create secret generic db-creds --dry-run=client -o yaml \
   | kubeseal --cert pub-cert.pem --format yaml > db-creds-sealed.yaml
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Image Scanning (Trivy)
 
 ```bash
@@ -346,6 +377,8 @@ trivy image $IMAGE
 trivy image --exit-code 1 --severity HIGH,CRITICAL myapp:latest
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## CIS Compliance (kube-bench)
 
 ```bash
@@ -371,6 +404,8 @@ kube-bench run --json | jq '.Controls[].tests[].results[]|select(.status=="FAIL"
 # Remediation report only
 kube-bench run --targets master 2>&1 | grep -A3 '\[FAIL\]'
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

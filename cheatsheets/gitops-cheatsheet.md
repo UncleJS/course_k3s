@@ -2,6 +2,16 @@
 
 > Mastering k3s Course | [↑ Course Index](../README.md)
 
+## Table of Contents
+
+- [Flux CLI](#flux-cli)
+- [Flux YAML Snippets](#flux-yaml-snippets)
+- [ArgoCD CLI](#argocd-cli)
+- [ArgoCD YAML Snippets](#argocd-yaml-snippets)
+- [GitOps Repo Structure](#gitops-repo-structure)
+
+---
+
 ## Flux CLI
 
 ### Install Flux CLI
@@ -157,6 +167,8 @@ flux uninstall
 flux uninstall --namespace=flux-system --keep-namespace=false
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## Flux YAML Snippets
 
 ### GitRepository
@@ -284,6 +296,8 @@ spec:
     name: oci-credentials
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## ArgoCD CLI
 
 ### Install
@@ -389,6 +403,8 @@ argocd account update-password \
   --new-password <new>
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## ArgoCD YAML Snippets
 
 ### Application
@@ -492,6 +508,8 @@ spec:
         - developers
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ## GitOps Repo Structure
 
 ```
@@ -529,6 +547,8 @@ fleet-infra/
     └── production/
         └── kustomization.yaml
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*
