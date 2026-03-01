@@ -1,0 +1,47 @@
+# Default values for mychart.
+# This is a YAML-formatted file — override with --values or --set.
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  # If tag is empty, defaults to Chart.appVersion in the template
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: traefik
+  host: chart.example.com
+  tls: false
+  tlsSecret: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+config:
+  logLevel: info
+  appPort: 80
+
+# Optional extra environment variables
+# extraEnv:
+#   MY_VAR: "my-value"
+#   ANOTHER_VAR: "another-value"
+
+# Override the full resource name
+fullnameOverride: ""

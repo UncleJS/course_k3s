@@ -1,0 +1,207 @@
+# Flux v2 GitOps lab resources
+# Apply with: kubectl apply -f flux-kustomization.yaml
+#
+# Prerequisites:
+#   - Flux v2 bootstrapped (see Lesson 02)
+#   - Update the GitRepository URL to point to your actual repo
+#
+# This file contains three Flux resources:
+#   1. GitRepository — source for your own application repo
+#   2. Kustomization — deploys from clusters/my-cluster/ path in that repo
+#   3. HelmRepository + HelmRelease — deploys nginx via Helm (self-contained example)
+
+# ==============================================================================
+# 1. GITREPOSITORY — points to your application Git repository
+# ==============================================================================
+# The source-controller watches this repo and makes it available as an artifact
+# for Kustomizations and HelmReleases.
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: my-cluster-repo
+  namespace: flux-system
+spec:
+  # ---- How often to poll Git for changes ----
+  # For instant reconciliation, set up a webhook instead (see Lesson 02)
+  interval: 1m
+
+  # ---- Repository URL ----
+  # Replace with your actual repository URL
+  url: https://github.com/PLACEHOLDER_ORG/PLACEHOLDER_REPO
+
+  # ---- Which branch / tag / commit to track ----
+  ref:
+    branch: main
+    # tag: v1.2.3          # pin to a specific tag
+    # commit: abc123def    # pin to a specific commit SHA (immutable)
+    # semver: ">=1.0.0"    # track latest tag matching semver range
+
+  # ---- Authentication for private repos ----
+  # Uncomment and create the referenced Secret:
+  #   kubectl create secret generic flux-git-auth \
+  #     --from-literal=username=git \
+  #     --from-literal=password=ghp_xxxxx \
+  #     -n flux-system
+  # secretRef:
+  #   name: flux-git-auth
+
+  # ---- Ignore paths that don't affect Kubernetes resources ----
+  ignore: |
+    # Ignore documentation and CI-only files
+    /docs/**
+    /.github/
+    /**/*.md
+    /**/*.txt
+
+---
+# ==============================================================================
+# 2. KUSTOMIZATION — applies manifests from the GitRepository
+# ==============================================================================
+# The kustomize-controller runs `kustomize build` on the specified path
+# and applies the resulting manifests to the cluster.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: my-cluster-apps
+  namespace: flux-system
+spec:
+  # ---- How often to re-apply (even if no Git changes) ----
+  interval: 5m
+
+  # ---- Path within the GitRepository to apply ----
+  # The path should contain a kustomization.yaml or plain YAML manifests
+  path: ./clusters/my-cluster
+
+  # ---- Whether to delete resources that are removed from Git ----
+  # IMPORTANT: set to true for true GitOps behavior
+  prune: true
+
+  # ---- Source reference ----
+  sourceRef:
+    kind: GitRepository
+    name: my-cluster-repo
+    namespace: flux-system   # can reference a source in another namespace
+
+  # ---- Target namespace (overrides namespace in manifests) ----
+  # targetNamespace: production  # uncomment to force all resources into one namespace
+
+  # ---- Health checks — Flux waits for these to become healthy ----
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: my-app
+      namespace: default
+
+  # ---- Timeout for the apply + health check ----
+  timeout: 3m
+
+  # ---- Wait for another Kustomization before applying ----
+  # dependsOn:
+  #   - name: infrastructure    # e.g., cert-manager must be healthy first
+  #     namespace: flux-system
+
+  # ---- Post-build variable substitution ----
+  # Replaces ${VAR} tokens in manifests with values from a ConfigMap or Secret
+  # postBuild:
+  #   substituteFrom:
+  #     - kind: ConfigMap
+  #       name: cluster-vars
+  #       optional: false
+
+  # ---- Force apply (useful when immutable fields need to be updated) ----
+  force: false
+
+---
+# ==============================================================================
+# 3a. HELMREPOSITORY — Helm chart repository source
+# ==============================================================================
+# The source-controller fetches the Helm repository index and caches it.
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: nginx-stable
+  namespace: flux-system
+spec:
+  # ---- How often to check for new chart versions ----
+  interval: 1h
+
+  # ---- Helm repository URL ----
+  url: https://helm.nginx.com/stable
+
+  # ---- For OCI-based Helm repos (e.g., GHCR) ----
+  # type: oci
+  # url: oci://ghcr.io/my-org/charts
+
+---
+# ==============================================================================
+# 3b. HELMRELEASE — manages a Helm chart installation
+# ==============================================================================
+# The helm-controller runs helm upgrade --install for this release.
+# Changes to 'values' or chart version trigger an automatic upgrade.
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  # ---- How often to reconcile the Helm release ----
+  interval: 10m
+
+  # ---- Chart source and version ----
+  chart:
+    spec:
+      # Chart name within the HelmRepository
+      chart: nginx-ingress
+      # Semantic version constraint — tracks latest matching version
+      version: ">=0.18.0 <1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: nginx-stable
+        namespace: flux-system
+      # How often to check for new chart versions
+      interval: 1h
+
+  # ---- Helm values (equivalent to values.yaml passed to helm install) ----
+  values:
+    controller:
+      replicaCount: 1         # single replica for dev/small clusters
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      service:
+        type: ClusterIP       # change to LoadBalancer or NodePort for external access
+
+  # ---- Values from a Secret or ConfigMap ----
+  # These are merged with the inline values above (inline takes precedence)
+  # valuesFrom:
+  #   - kind: Secret
+  #     name: nginx-helm-secrets
+  #     valuesKey: values.yaml
+
+  # ---- Install behaviour ----
+  install:
+    createNamespace: true     # create the target namespace if it doesn't exist
+    remediation:
+      retries: 3              # retry failed installs up to 3 times before giving up
+
+  # ---- Upgrade behaviour ----
+  upgrade:
+    cleanupOnFail: true       # clean up partial resources on failed upgrade
+    remediation:
+      retries: 3
+      remediateLastFailure: true   # rollback on last failed attempt
+
+  # ---- Rollback settings ----
+  rollback:
+    timeout: 5m
+    cleanupOnFail: true
+
+  # ---- Wait for these resources before starting this release ----
+  # dependsOn:
+  #   - name: cert-manager
+  #     namespace: cert-manager

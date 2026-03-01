@@ -1,0 +1,347 @@
+# Gitea Actions — Build and Deploy to k3s (Air-Gap Compatible)
+# .gitea/workflows/deploy.yml
+#
+# Compatible with Gitea Act Runner (github.com/go-gitea/act_runner)
+# Runs entirely on-premises — no internet access required after initial setup.
+#
+# Required secrets (Gitea Repository → Settings → Actions → Secrets):
+#   REGISTRY_USER        Username for local container registry
+#   REGISTRY_PASSWORD    Password for local container registry
+#   KUBECONFIG_BASE64    Base64-encoded kubeconfig for CI service account
+#
+# Required: A local container registry at registry.example.com
+# Required: Act Runner deployed and registered (see Lesson 03)
+
+name: Build and Deploy (On-Prem)
+
+# ==============================================================================
+# TRIGGERS
+# ==============================================================================
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+  # Allow manual trigger from Gitea UI
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "Force deploy even if no changes"
+        type: boolean
+        default: false
+
+# ==============================================================================
+# CONCURRENCY — queue deploys, never run two at once
+# ==============================================================================
+concurrency:
+  group: deploy-${{ gitea.ref_name }}
+  cancel-in-progress: false
+
+# ==============================================================================
+# GLOBAL ENVIRONMENT VARIABLES
+# All references to external services use the local/on-prem addresses
+# ==============================================================================
+env:
+  # Local container registry — no internet access needed
+  REGISTRY: registry.example.com
+  IMAGE_NAME: my-app
+  IMAGE_FULL: registry.example.com/my-app
+
+  # Helm release settings
+  HELM_RELEASE_NAME: my-app
+  HELM_CHART_PATH: ./charts/my-app
+  DEPLOY_NAMESPACE: production
+  DEPLOY_TIMEOUT: 5m
+
+# ==============================================================================
+# JOBS
+# ==============================================================================
+jobs:
+
+  # ----------------------------------------------------------------------------
+  # JOB 1: TEST — Run unit tests using a local runner image
+  # runs-on: ubuntu-latest maps to the runner label configured in Act Runner
+  # (typically maps to a pre-pulled local Docker image)
+  # ----------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # actions/checkout is mirrored to your local Gitea instance
+      # See Lesson 03 for how to mirror GitHub Actions to Gitea
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Cache pip packages using the Gitea Actions cache service
+      # (served locally — no internet needed)
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip \
+            --index-url http://pypi.example.com/simple/ \   # local PyPI mirror
+            --trusted-host pypi.example.com
+          pip install -r requirements.txt -r requirements-test.txt \
+            --index-url http://pypi.example.com/simple/ \
+            --trusted-host pypi.example.com
+
+      - name: Run unit tests
+        run: |
+          pytest tests/unit/ \
+            --junit-xml=test-results/unit.xml \
+            -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ gitea.sha }}
+          path: test-results/
+
+  # ----------------------------------------------------------------------------
+  # JOB 2: BUILD — Build the Docker image and push to local registry
+  # No internet access required — all base images are pre-pulled locally
+  # ----------------------------------------------------------------------------
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    outputs:
+      image-tag: ${{ steps.set-tag.outputs.tag }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Set a consistent image tag based on the Git SHA
+      - name: Set image tag
+        id: set-tag
+        run: |
+          SHORT_SHA="${{ gitea.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:8}"
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Building image: ${{ env.IMAGE_FULL }}:${SHORT_SHA}"
+
+      # Log in to the local container registry
+      - name: Log in to local registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | \
+            docker login "${{ env.REGISTRY }}" \
+              --username "${{ secrets.REGISTRY_USER }}" \
+              --password-stdin
+
+      # Set up Docker Buildx for layer caching
+      # Uses a local registry-based cache (no internet needed)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          # Use a locally hosted BuildKit daemon if available
+          # driver-opts: |
+          #   network=host
+
+      # Build the image
+      # Uses local registry as cache backend — all layer data stays on-prem
+      - name: Build and push Docker image
+        run: |
+          TAG="${{ steps.set-tag.outputs.tag }}"
+
+          docker build \
+            --tag "${{ env.IMAGE_FULL }}:${TAG}" \
+            --tag "${{ env.IMAGE_FULL }}:latest" \
+            --build-arg GIT_COMMIT="${{ gitea.sha }}" \
+            --build-arg GIT_BRANCH="${{ gitea.ref_name }}" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.revision=${{ gitea.sha }}" \
+            --label "org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}" \
+            --cache-from type=registry,ref=${{ env.IMAGE_FULL }}:buildcache \
+            --cache-to type=registry,ref=${{ env.IMAGE_FULL }}:buildcache,mode=max \
+            .
+
+          docker push "${{ env.IMAGE_FULL }}:${TAG}"
+          docker push "${{ env.IMAGE_FULL }}:latest"
+
+      # Run a quick smoke test on the built image before deploying
+      - name: Smoke test the image
+        run: |
+          TAG="${{ steps.set-tag.outputs.tag }}"
+
+          # Start the container
+          CONTAINER_ID=$(docker run -d \
+            --rm \
+            --name "smoke-test-$$" \
+            -p 18080:8080 \
+            -e DATABASE_URL=sqlite:///:memory: \
+            "${{ env.IMAGE_FULL }}:${TAG}")
+
+          # Wait up to 30s for the app to be ready
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:18080/healthz > /dev/null 2>&1; then
+              echo "App is healthy after ${i} seconds"
+              break
+            fi
+            sleep 1
+          done
+
+          # Assert health check response
+          curl -sf http://localhost:18080/healthz | grep -q '"status":"ok"' || \
+            (echo "Health check failed" && docker stop "$CONTAINER_ID" && exit 1)
+
+          docker stop "$CONTAINER_ID"
+          echo "Smoke test passed"
+
+  # ----------------------------------------------------------------------------
+  # JOB 3: DEPLOY — Deploy to k3s using Helm
+  # In Gitea Actions, there are no built-in approval gates like GitHub Environments.
+  # For production, protect the 'main' branch with required reviews instead.
+  # ----------------------------------------------------------------------------
+  deploy:
+    name: Deploy to k3s
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+
+    steps:
+      - name: Checkout source (for Helm chart)
+        uses: actions/checkout@v4
+
+      # Install Helm from local mirror or pre-bundled binary
+      # In air-gapped environments, pre-install Helm in the runner Docker image
+      - name: Install Helm
+        run: |
+          # Check if Helm is already in the runner image
+          if ! command -v helm &>/dev/null; then
+            # Fetch from local mirror instead of GitHub releases
+            curl -fsSL http://tools.example.com/helm/helm-v3.14.0-linux-amd64.tar.gz \
+              | tar xz -C /usr/local/bin --strip-components=1 linux-amd64/helm
+          fi
+          helm version
+
+      # Install kubectl (pre-installed in runner image or from local mirror)
+      - name: Install kubectl
+        run: |
+          if ! command -v kubectl &>/dev/null; then
+            curl -fsSL http://tools.example.com/kubectl/kubectl-1.29.0 \
+              -o /usr/local/bin/kubectl
+            chmod +x /usr/local/bin/kubectl
+          fi
+          kubectl version --client
+
+      # Decode and write kubeconfig from the Gitea repository secret
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      # Verify the cluster is reachable from the runner
+      - name: Verify cluster connectivity
+        run: |
+          kubectl cluster-info
+          kubectl get nodes -o wide
+
+      # Deploy the application via Helm
+      - name: Deploy with Helm
+        run: |
+          TAG="${{ needs.build.outputs.image-tag }}"
+
+          helm upgrade --install "${{ env.HELM_RELEASE_NAME }}" \
+            "${{ env.HELM_CHART_PATH }}" \
+            --namespace "${{ env.DEPLOY_NAMESPACE }}" \
+            --create-namespace \
+            --set image.repository="${{ env.IMAGE_FULL }}" \
+            --set image.tag="${TAG}" \
+            --set image.pullPolicy=Always \
+            --set replicaCount=2 \
+            --set resources.requests.cpu=50m \
+            --set resources.requests.memory=64Mi \
+            --set resources.limits.cpu=200m \
+            --set resources.limits.memory=128Mi \
+            --atomic \
+            --timeout "${{ env.DEPLOY_TIMEOUT }}" \
+            --wait \
+            --history-max 5       # keep only last 5 releases in Helm history
+
+      # Verify the deployment is healthy
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/"${{ env.HELM_RELEASE_NAME }}" \
+            --namespace "${{ env.DEPLOY_NAMESPACE }}" \
+            --timeout="${{ env.DEPLOY_TIMEOUT }}"
+
+          # Show current pod status
+          kubectl get pods \
+            --namespace "${{ env.DEPLOY_NAMESPACE }}" \
+            -l "app.kubernetes.io/name=${{ env.HELM_RELEASE_NAME }}"
+
+      # Print summary for log visibility
+      - name: Print deployment summary
+        run: |
+          echo "============================================"
+          echo " DEPLOYMENT SUMMARY"
+          echo "============================================"
+          echo " App:        ${{ env.HELM_RELEASE_NAME }}"
+          echo " Image:      ${{ env.IMAGE_FULL }}:${{ needs.build.outputs.image-tag }}"
+          echo " Namespace:  ${{ env.DEPLOY_NAMESPACE }}"
+          echo " Commit:     ${{ gitea.sha }}"
+          echo " Branch:     ${{ gitea.ref_name }}"
+          echo " Actor:      ${{ gitea.actor }}"
+          echo " Deployed:   $(date -u)"
+          echo "============================================"
+
+  # ----------------------------------------------------------------------------
+  # JOB 4: NOTIFY — Post-deploy notification
+  # Uses a local webhook endpoint instead of Slack (air-gap compatible)
+  # Replace with Slack if outbound internet access is available
+  # ----------------------------------------------------------------------------
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy]
+    if: always()
+
+    steps:
+      - name: Send notification
+        run: |
+          STATUS="${{ needs.deploy.result }}"
+          TAG="${{ needs.build.outputs.image-tag }}"
+
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="✅"
+            MESSAGE="Deploy SUCCEEDED"
+          else
+            EMOJI="❌"
+            MESSAGE="Deploy FAILED"
+          fi
+
+          echo "${EMOJI} ${MESSAGE}"
+          echo "Repo: ${{ gitea.repository }}"
+          echo "Branch: ${{ gitea.ref_name }}"
+          echo "Image tag: ${TAG}"
+          echo "Commit: ${{ gitea.sha }}"
+          echo "Actor: ${{ gitea.actor }}"
+
+          # Send to local webhook (replace URL with your on-prem notification system)
+          # Options: Mattermost, Rocket.Chat, ntfy.sh (self-hosted), custom webhook
+          curl -sf \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"${EMOJI} ${MESSAGE} — ${{ gitea.repository }}\",
+              \"branch\": \"${{ gitea.ref_name }}\",
+              \"commit\": \"${{ gitea.sha }}\",
+              \"image\": \"${TAG}\",
+              \"actor\": \"${{ gitea.actor }}\"
+            }" \
+            http://notifications.example.com/webhook/gitea \
+          || echo "Notification failed — continuing anyway"

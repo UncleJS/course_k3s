@@ -1,0 +1,333 @@
+# GitHub Actions — Build, Test, and Deploy to k3s
+# .github/workflows/deploy.yml
+#
+# Triggers on push to main branch and manual dispatch.
+# Pipeline: test → build+push → deploy → notify
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   KUBECONFIG_BASE64    Base64-encoded kubeconfig for CI service account
+#   SLACK_WEBHOOK_URL    Slack Incoming Webhook URL for notifications
+#
+# Required GitHub Environment:
+#   "production" — configure with required reviewers for approval gate
+
+name: Build, Test, and Deploy
+
+# ==============================================================================
+# TRIGGERS
+# ==============================================================================
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".gitignore"
+  workflow_dispatch:          # allow manual trigger from the GitHub Actions UI
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+# ==============================================================================
+# CONCURRENCY — prevent multiple deploys to the same environment at once
+# cancel-in-progress: false means queue the new run instead of cancelling
+# ==============================================================================
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+# ==============================================================================
+# GLOBAL ENVIRONMENT VARIABLES
+# ==============================================================================
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}       # e.g., my-org/my-app
+  HELM_RELEASE_NAME: my-app
+  HELM_CHART_PATH: ./charts/my-app
+  DEPLOY_NAMESPACE: production
+  DEPLOY_TIMEOUT: 5m
+
+# ==============================================================================
+# JOBS
+# ==============================================================================
+jobs:
+
+  # ----------------------------------------------------------------------------
+  # JOB 1: TEST — Run unit and integration tests
+  # ----------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Cache language-specific dependencies for faster runs
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Adjust this step for your language/framework
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run unit tests
+        run: |
+          pytest tests/unit/ \
+            --junit-xml=test-results/unit.xml \
+            --cov=src \
+            --cov-report=xml:coverage.xml \
+            -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()           # upload even if tests fail
+        with:
+          name: test-results
+          path: |
+            test-results/
+            coverage.xml
+
+  # ----------------------------------------------------------------------------
+  # JOB 2: BUILD — Build and push the Docker image to GHCR
+  # ----------------------------------------------------------------------------
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test              # only build if tests pass
+    outputs:
+      # Pass the image digest to subsequent jobs for immutable reference
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Set up QEMU for multi-platform builds (optional — remove if single-arch)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # BuildKit enables cache, parallel stages, and multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Authenticate to GHCR using the built-in GITHUB_TOKEN
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate image tags and labels from Git metadata
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with the short Git SHA (e.g., abc1234) — immutable
+            type=sha,prefix=,suffix=,format=short
+            # Tag with the branch name (e.g., main) — mutable
+            type=ref,event=branch
+            # Tag as 'latest' only on the default branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with semver on Git tags (e.g., 1.2.3 on tag v1.2.3)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=my-app
+            org.opencontainers.image.description=My k3s application
+            org.opencontainers.image.vendor=My Org
+
+      # Build the image and push to GHCR
+      # Uses GitHub Actions cache for layer reuse between runs
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Build for both architectures (remove if only amd64 needed)
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions cache — persists between workflow runs
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Pass build-time arguments
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+
+      # Record the image reference for traceability
+      - name: Print image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
+
+  # ----------------------------------------------------------------------------
+  # JOB 3: DEPLOY — Deploy to k3s using Helm
+  # environment: production adds the approval gate
+  # ----------------------------------------------------------------------------
+  deploy:
+    name: Deploy to k3s
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+
+    # Reference the GitHub Environment — enables approval gates and
+    # environment-specific secrets
+    environment:
+      name: production
+      url: https://app.example.com      # shown as a clickable link in the UI
+
+    steps:
+      - name: Checkout source (for Helm chart)
+        uses: actions/checkout@v4
+
+      # Set up kubectl and Helm
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "1.29.0"
+
+      # Decode and write the kubeconfig from the repository secret
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      # Verify connectivity before attempting deploy
+      - name: Verify cluster connectivity
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      # Deploy using Helm
+      # --atomic: automatically rolls back if deploy fails
+      # --wait: blocks until all pods are ready
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
+            ${{ env.HELM_CHART_PATH }} \
+            --namespace ${{ env.DEPLOY_NAMESPACE }} \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.build.outputs.image-tag }} \
+            --set image.digest=${{ needs.build.outputs.image-digest }} \
+            --set replicaCount=2 \
+            --set resources.requests.cpu=50m \
+            --set resources.requests.memory=64Mi \
+            --atomic \
+            --timeout ${{ env.DEPLOY_TIMEOUT }} \
+            --wait
+
+      # Verify the deployment is healthy after Helm finishes
+      - name: Verify deployment health
+        run: |
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }} \
+            -n ${{ env.DEPLOY_NAMESPACE }} \
+            --timeout=${{ env.DEPLOY_TIMEOUT }}
+
+          # Optional: run a smoke test against the deployed service
+          # POD=$(kubectl get pod -n ${{ env.DEPLOY_NAMESPACE }} \
+          #   -l app=${{ env.HELM_RELEASE_NAME }} \
+          #   -o jsonpath='{.items[0].metadata.name}')
+          # kubectl exec -n ${{ env.DEPLOY_NAMESPACE }} $POD -- \
+          #   curl -sf http://localhost:8080/healthz
+
+      # Record deployment in GitHub Deployment API
+      - name: Record deployment
+        if: success()
+        run: |
+          echo "Deployed ${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}" \
+            "to ${{ env.DEPLOY_NAMESPACE }} at $(date -u)"
+
+  # ----------------------------------------------------------------------------
+  # JOB 4: NOTIFY — Send Slack notification on success or failure
+  # always() ensures this runs even if previous jobs failed
+  # ----------------------------------------------------------------------------
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy]
+    if: always()             # run regardless of previous job outcomes
+
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "color=good" >> $GITHUB_OUTPUT
+            echo "emoji=:white_check_mark:" >> $GITHUB_OUTPUT
+            echo "text=Deploy succeeded" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.deploy.result }}" == "skipped" ]]; then
+            echo "color=warning" >> $GITHUB_OUTPUT
+            echo "emoji=:warning:" >> $GITHUB_OUTPUT
+            echo "text=Deploy skipped (test or build failed)" >> $GITHUB_OUTPUT
+          else
+            echo "color=danger" >> $GITHUB_OUTPUT
+            echo "emoji=:x:" >> $GITHUB_OUTPUT
+            echo "text=Deploy FAILED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.text }} — ${{ github.repository }}",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> by ${{ github.actor }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Workflow Run",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

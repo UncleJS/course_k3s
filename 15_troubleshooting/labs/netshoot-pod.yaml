@@ -1,0 +1,253 @@
+# =============================================================================
+# netshoot-pod.yaml — Network debugging pod using nicolaka/netshoot
+# =============================================================================
+#
+# nicolaka/netshoot is a purpose-built Docker image containing:
+#   Network tools: curl, wget, nmap, ncat, tcpdump, iperf3, mtr, traceroute
+#   DNS tools:     dig, nslookup, host, drill
+#   K8s tools:     kubectl (optional via env)
+#   HTTP tools:    http (httpie), curl
+#   Misc:          jq, vim, strace, ltrace, ss, ip, iptables, conntrack
+#
+# Usage:
+#   # Deploy the persistent netshoot pod:
+#   kubectl apply -f netshoot-pod.yaml
+#
+#   # Open an interactive shell:
+#   kubectl exec -it netshoot -- /bin/bash
+#
+#   # Run a one-off command:
+#   kubectl exec netshoot -- curl -v http://my-service.my-namespace.svc.cluster.local/
+#
+#   # Clean up when done:
+#   kubectl delete -f netshoot-pod.yaml
+#
+# Quick one-shot usage (no persistent pod):
+#   kubectl run netshoot --rm -it --restart=Never \
+#     --image=nicolaka/netshoot -- /bin/bash
+#
+# =============================================================================
+# USEFUL COMMANDS (run inside the netshoot pod):
+#
+# DNS QUERIES:
+#   nslookup kubernetes.default.svc.cluster.local
+#   dig my-service.my-namespace.svc.cluster.local
+#   dig +short my-service.my-namespace.svc.cluster.local
+#   dig +trace my-service.my-namespace.svc.cluster.local  # full DNS trace
+#   drill my-service.my-namespace.svc.cluster.local       # alternative to dig
+#
+# TCP CONNECTIONS:
+#   nc -zv my-service.my-namespace.svc.cluster.local 8080  # TCP port test
+#   nc -zv my-service 5432                                  # PostgreSQL
+#   curl -v http://my-service.my-namespace.svc.cluster.local/healthz
+#   curl -sk https://my-service/healthz                     # skip TLS verify
+#   httpie http://my-service/healthz                        # HTTPie client
+#
+# PACKET CAPTURE:
+#   tcpdump -i eth0 -n                                      # All traffic
+#   tcpdump -i eth0 -n host 10.42.1.5                       # Traffic to/from IP
+#   tcpdump -i eth0 -n port 80                              # HTTP traffic
+#   tcpdump -i any -n -w /tmp/capture.pcap                  # Write to file
+#   # Copy the capture file out:
+#   # kubectl cp netshoot:/tmp/capture.pcap ./capture.pcap
+#
+# PORT SCANNING:
+#   nmap -p 1-1000 my-service.my-namespace.svc.cluster.local
+#   nmap -sV my-service                                     # Version detection
+#
+# BANDWIDTH TESTING:
+#   # Start iperf3 server in another pod, then:
+#   iperf3 -c <iperf-server-pod-ip> -t 10
+#   iperf3 -c <ip> -t 10 -P 4                               # 4 parallel streams
+#
+# LATENCY / PATH TRACING:
+#   mtr --report <host>                                     # Traceroute + ping
+#   traceroute <host>
+#   ping -c10 <host>
+#
+# INTERFACE AND ROUTING:
+#   ip addr                                                 # Show interfaces + IPs
+#   ip route                                                # Show routing table
+#   ss -tulnp                                               # Show listening ports
+#   conntrack -L                                            # Show conntrack table
+#
+# TLS / CERTIFICATE INSPECTION:
+#   openssl s_client -connect my-service:443
+#   openssl s_client -connect my-service:443 -servername my-service
+#   echo | openssl s_client -connect my-service:443 2>/dev/null \
+#     | openssl x509 -noout -dates
+# =============================================================================
+
+---
+# =============================================================================
+# 1. Persistent netshoot Pod
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netshoot
+  # Change namespace to match the namespace you want to debug from:
+  # namespace: my-app
+  labels:
+    app: netshoot
+    purpose: network-debugging
+  annotations:
+    description: "Network debug pod — delete after use"
+spec:
+  # ---- Tolerations --------------------------------------------------------
+  # Allow scheduling on any node, including control-plane
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+    - operator: Exists
+      effect: NoExecute
+    - operator: Exists
+      effect: PreferNoSchedule
+
+  # ---- Node selection (optional) -----------------------------------------
+  # Pin to a specific node to debug node-specific network issues.
+  # Replace 'worker-1' with the actual node name:
+  # kubectl get nodes --show-labels
+  # nodeSelector:
+  #   kubernetes.io/hostname: worker-1
+
+  # ---- Network mode -------------------------------------------------------
+  # Default: false — pod uses its own network namespace (pod networking)
+  # Set to true to use the HOST network namespace for node-level inspection.
+  # WARNING: hostNetwork: true bypasses the CNI and gives access to the
+  # host network stack including all node interfaces and ports.
+  hostNetwork: false
+  # Uncomment for host networking:
+  # hostNetwork: true
+  # dnsPolicy: ClusterFirstWithHostNet   # Required when hostNetwork: true
+
+  # ---- Container ----------------------------------------------------------
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot:latest
+      # Keep the pod alive for interactive use
+      command: ["sleep", "infinity"]
+
+      # ---- Resources ------------------------------------------------------
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+
+      # ---- Security context (minimal — adjust for tcpdump/iptables) -------
+      # NET_ADMIN and NET_RAW are required for tcpdump, iperf3, and iptables
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN   # Required for: iptables, ip route changes, conntrack
+            - NET_RAW     # Required for: tcpdump, raw sockets, ping
+
+  # ---- Restart policy -----------------------------------------------------
+  restartPolicy: Never
+  automountServiceAccountToken: false
+
+---
+# =============================================================================
+# 2. Job variant — run a specific test and exit
+# =============================================================================
+# Use this when you want to run a repeatable network test as a Job.
+# The Job creates a pod, runs the test, and exits.
+#
+# Example tests:
+#   - DNS resolution check
+#   - HTTP endpoint connectivity
+#   - TCP port reachability
+#
+# Apply:
+#   kubectl apply -f netshoot-pod.yaml
+#   kubectl wait job/netshoot-dns-check --for=condition=Complete --timeout=60s
+#   kubectl logs job/netshoot-dns-check
+#   kubectl delete job/netshoot-dns-check
+#
+# Customise the 'command' field below to run any netshoot command.
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: netshoot-dns-check
+  labels:
+    app: netshoot
+    purpose: network-test
+spec:
+  # Run once; do not retry on failure
+  completions: 1
+  parallelism: 1
+  backoffLimit: 0
+  # Clean up completed Job pods after 60 seconds
+  ttlSecondsAfterFinished: 60
+
+  template:
+    metadata:
+      labels:
+        app: netshoot
+        job: dns-check
+    spec:
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+
+      # ---- Pin to a specific node (optional) ------------------------------
+      # nodeSelector:
+      #   kubernetes.io/hostname: worker-1
+
+      containers:
+        - name: netshoot
+          image: nicolaka/netshoot:latest
+          # Customise this command to run your specific test:
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "=== DNS Resolution Test ==="
+              echo ""
+
+              echo "--- Kubernetes service DNS ---"
+              nslookup kubernetes.default.svc.cluster.local
+              echo ""
+
+              echo "--- CoreDNS pod DNS ---"
+              COREDNS_IP=$(nslookup kube-dns.kube-system.svc.cluster.local \
+                | grep Address | tail -1 | awk '{print $2}')
+              echo "CoreDNS IP: ${COREDNS_IP}"
+              echo ""
+
+              echo "--- External DNS (if configured) ---"
+              nslookup google.com || echo "WARN: External DNS may not be configured"
+              echo ""
+
+              echo "=== TCP Connectivity Test ==="
+              echo "--- Kubernetes API server ---"
+              nc -zv kubernetes.default.svc.cluster.local 443 && \
+                echo "PASS: API server reachable" || \
+                echo "FAIL: API server not reachable"
+              echo ""
+
+              echo "=== All tests completed ==="
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+
+      restartPolicy: Never
+      automountServiceAccountToken: false

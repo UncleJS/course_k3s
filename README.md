@@ -2,7 +2,7 @@
 
 > A comprehensive, hands-on course covering everything you need to install, operate, secure, monitor, and maintain k3s clusters in production.
 
-[![CC BY 4.0](https://licensebuttons.net/l/by/4.0/88x31.png)](LICENSE.md)
+[![CC BY-NC-SA 4.0](https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png)](LICENSE.md)
 [![k3s](https://img.shields.io/badge/k3s-v1.29%2B-brightgreen)](https://k3s.io)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-compatible-blue)](https://kubernetes.io)
 
@@ -30,6 +30,7 @@
 | 13 | [Backup & Disaster Recovery](#module-13--backup--disaster-recovery) | 🔴 Advanced | 3 |
 | 14 | [Maintenance](#module-14--maintenance) | 🟡 Intermediate | 3 |
 | 15 | [Troubleshooting](#module-15--troubleshooting) | 🟡–🔴 All Levels | 5 |
+| 16 | [Moving from Podman to k3s](#module-16--moving-from-podman-to-k3s) | 🟢–🟡 Beginner/Intermediate | 4 |
 
 ### 📋 Cheatsheets
 
@@ -45,6 +46,12 @@
 | [GitOps](cheatsheets/gitops-cheatsheet.md) | Flux & ArgoCD CLI quick reference |
 | [Troubleshooting](cheatsheets/troubleshooting-cheatsheet.md) | Diagnostic sequences, error fixes |
 | [Backup & DR](cheatsheets/backup-dr-cheatsheet.md) | etcd snapshots, Velero, restore |
+
+### 📖 Reference
+
+| File | Description |
+|---|---|
+| [GLOSSARY.md](GLOSSARY.md) | Alphabetical dictionary of 70+ Kubernetes, k3s, and ecosystem terms |
 
 ---
 
@@ -72,10 +79,13 @@ flowchart TD
     P --> Q[14 Maintenance]
     Q --> R[15 Troubleshooting]
     R --> S([🎓 Certified k3s Expert])
+    B -.->|Coming from Podman?| T[16 Podman → k3s]
+    T -.-> E
 
     style A fill:#22c55e,color:#fff
     style S fill:#6366f1,color:#fff
     style K fill:#f59e0b,color:#fff
+    style T fill:#0ea5e9,color:#fff
 ```
 
 ---
@@ -290,13 +300,28 @@ flowchart TD
 
 ---
 
+## Module 16 — Moving from Podman to k3s
+
+> 🟢–🟡 Beginner/Intermediate · For developers already using Podman or Podman Compose
+
+| Lesson | File |
+|--------|------|
+| 01 | [Mental Model Shift: Containers vs Pods](16_podman_to_k3s/01_mental_model_shift.md) |
+| 02 | [Translating Podman Compose to Kubernetes Manifests](16_podman_to_k3s/02_compose_to_k3s.md) |
+| 03 | [Images and Registries](16_podman_to_k3s/03_images_and_registries.md) |
+| 04 | [Full Migration Walkthrough](16_podman_to_k3s/04_migration_walkthrough.md) |
+| Labs | [podman-compose-example.yml](16_podman_to_k3s/labs/podman-compose-example.yml) · [compose-to-k3s.yaml](16_podman_to_k3s/labs/compose-to-k3s.yaml) |
+
+---
+
 ## How to Use This Course
 
 1. **Follow the modules in order** if you are new to Kubernetes/k3s
 2. **Jump to any module** if you have specific prior knowledge
 3. **Run the labs** — every module has a `labs/` folder with working YAML and shell scripts
 4. **Use the cheatsheets** as quick reference during and after the course
-5. **Re-read the troubleshooting module** whenever you get stuck in production
+5. **Consult the [Glossary](GLOSSARY.md)** to look up unfamiliar terms at any point
+6. **Re-read the troubleshooting module** whenever you get stuck in production
 
 ## Requirements
 
@@ -311,4 +336,4 @@ flowchart TD
 
 ---
 
-*Licensed under [CC BY 4.0](LICENSE.md) · © 2026 Mastering k3s Course Authors*
+*Licensed under [CC BY-NC-SA 4.0](LICENSE.md) · © 2026 UncleJS*

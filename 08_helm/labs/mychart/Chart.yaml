@@ -1,0 +1,15 @@
+apiVersion: v2
+name: mychart
+description: A sample Helm chart for the Mastering k3s Course
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/example/mychart
+maintainers:
+  - name: UncleJS
+    email: course@example.com
+keywords:
+  - nginx
+  - web
+  - k3s
+  - example

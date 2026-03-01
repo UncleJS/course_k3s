@@ -1,0 +1,257 @@
+---
+# =============================================================================
+# Module 09 · Security Lab — RBAC Demo
+# =============================================================================
+# Demonstrates:
+#   - Namespace creation
+#   - ServiceAccount for a CI/CD deployer
+#   - Role + RoleBinding for the deployer (limited deployment permissions)
+#   - Role + RoleBinding for a developer group (read-only)
+#   - ClusterRole + ClusterRoleBinding for cluster-level read access
+#
+# Apply:  kubectl apply -f rbac-role.yaml
+# Verify: see the Lab section in 01_rbac.md
+# Cleanup:
+#   kubectl delete namespace rbac-demo
+#   kubectl delete clusterrole cluster-reader
+#   kubectl delete clusterrolebinding cluster-reader-binding
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Namespace
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rbac-demo
+  labels:
+    # Apply baseline Pod Security Standards to the demo namespace
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+
+---
+# -----------------------------------------------------------------------------
+# 2. ServiceAccount — ci-deployer
+#    This represents the identity used by a CI/CD pipeline (e.g., GitHub Actions,
+#    GitLab CI) when it deploys to the rbac-demo namespace.
+#    automountServiceAccountToken is set to false here; the CI job would
+#    explicitly request a token via a projected volume or the TokenRequest API.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deployer
+  namespace: rbac-demo
+  labels:
+    app.kubernetes.io/component: ci-cd
+automountServiceAccountToken: false
+
+---
+# -----------------------------------------------------------------------------
+# 3. Role — deployer
+#    Grants the minimum permissions a CI job needs to roll out an application:
+#    - Read/list/watch Deployments (to check rollout status)
+#    - Create/update/patch Deployments (to push new image tags)
+#    - Read/list/watch Services (to verify they exist)
+#    - Create/update/patch Services (to manage service endpoints)
+#    - Read/list/watch/create/update/patch ConfigMaps (for app configuration)
+#
+#    NOTE: 'delete' is intentionally omitted — the CI job should not be able
+#    to remove production resources accidentally or maliciously.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: rbac-demo
+rules:
+  # Manage Deployments (core of what CI needs to do)
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Read ReplicaSets to verify rollout health
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # Manage Services and ConfigMaps (application config and network)
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Read pods to check deployment health
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+# -----------------------------------------------------------------------------
+# 4. RoleBinding — bind ci-deployer ServiceAccount to the deployer Role
+#    Scoped to rbac-demo namespace only.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deployer-binding
+  namespace: rbac-demo
+subjects:
+  # The ServiceAccount defined above — this is the pod identity used by CI
+  - kind: ServiceAccount
+    name: ci-deployer
+    namespace: rbac-demo
+roleRef:
+  kind: Role
+  name: deployer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# -----------------------------------------------------------------------------
+# 5. Role — reader
+#    Read-only access to all common resources in the namespace.
+#    Suitable for developers who need to inspect what is running but
+#    must not be able to modify workloads.
+#
+#    IMPORTANT: 'secrets' is NOT included here. If a developer needs to read
+#    a specific secret, add a separate, explicit binding scoped to that secret.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reader
+  namespace: rbac-demo
+rules:
+  # Core resources — read-only
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - configmaps
+      - endpoints
+      - events
+      - persistentvolumeclaims
+      - resourcequotas
+      - limitranges
+      - serviceaccounts
+    verbs: ["get", "list", "watch"]
+
+  # Apps resources — read-only
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - daemonsets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+
+  # Batch resources — read-only
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+
+  # Networking resources — read-only
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+
+---
+# -----------------------------------------------------------------------------
+# 6. RoleBinding — bind the 'developers' group to the reader Role
+#    In k3s with client certificate auth, a user's 'O' (Organisation) field
+#    in their certificate becomes their group membership.
+#    Any user with O=developers in their cert gets read-only access here.
+#
+#    Test with:
+#    kubectl auth can-i list pods --as alice --as-group developers -n rbac-demo
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developers-reader-binding
+  namespace: rbac-demo
+subjects:
+  # Group binding — applies to all users in the 'developers' group
+  - kind: Group
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# -----------------------------------------------------------------------------
+# 7. ClusterRole — cluster-reader
+#    Read access to non-namespaced (cluster-scoped) resources.
+#    These resources cannot be accessed via a namespaced Role.
+#
+#    Use cases:
+#    - Monitoring agents that need to list all nodes
+#    - Storage provisioners that need to inspect PersistentVolumes
+#    - Platform engineers auditing cluster-level resources
+#
+#    Note: This is a ClusterRole but it is intentionally minimal.
+#    It does NOT include 'secrets' or any write verbs.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-reader
+  labels:
+    app.kubernetes.io/part-of: rbac-demo
+rules:
+  # Node information — required by monitoring tools (metrics-server, Prometheus)
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/status", "nodes/metrics"]
+    verbs: ["get", "list", "watch"]
+
+  # PersistentVolumes — cluster-scoped storage
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+
+  # Namespace listing — so the subject can see all namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+
+  # StorageClasses
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+
+  # ClusterRoles and ClusterRoleBindings — for auditing
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+
+---
+# -----------------------------------------------------------------------------
+# 8. ClusterRoleBinding — bind cluster-reader to a specific user
+#    In a real deployment replace 'cluster-reader-user' with the CN from
+#    the user's client certificate, or use a ServiceAccount reference.
+#
+#    Test with:
+#    kubectl auth can-i list nodes --as cluster-reader-user
+#    kubectl auth can-i list persistentvolumes --as cluster-reader-user
+#    kubectl auth can-i list secrets --as cluster-reader-user  # should be 'no'
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-reader-binding
+  labels:
+    app.kubernetes.io/part-of: rbac-demo
+subjects:
+  - kind: User
+    name: cluster-reader-user   # replace with actual username (cert CN)
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-reader
+  apiGroup: rbac.authorization.k8s.io

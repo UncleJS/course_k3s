@@ -1,0 +1,223 @@
+# ArgoCD Application lab resources
+# Apply with: kubectl apply -f argocd-application.yaml
+#
+# Prerequisites:
+#   - ArgoCD installed in the argocd namespace (see Lesson 03)
+#   - kubectl context pointing at your k3s cluster
+#
+# This file contains:
+#   1. AppProject — defines allowed sources and destinations for a team
+#   2. Application — deploys nginx via Helm chart with automated sync
+
+# ==============================================================================
+# 1. APPPROJECT — scopes what an Application can access
+# ==============================================================================
+# An AppProject restricts which Git repos, clusters, and namespaces an
+# Application can use. The 'default' project allows everything — use custom
+# projects for multi-team environments.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nginx-project
+  namespace: argocd
+  # Finalizer prevents accidental deletion of a project with Applications
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Project for nginx demo applications"
+
+  # ---- Allowed Git/Helm source repositories ----
+  # Only Applications in this project can use these repos as sources
+  sourceRepos:
+    - "https://helm.nginx.com/stable"       # nginx Helm repo
+    - "https://github.com/PLACEHOLDER_ORG/*" # any repo in your GitHub org
+    - "https://charts.helm.sh/stable"        # stable Helm charts
+
+  # ---- Allowed destination clusters and namespaces ----
+  # '*' matches all namespaces; use specific namespaces in production
+  destinations:
+    - namespace: default
+      server: https://kubernetes.default.svc
+    - namespace: nginx
+      server: https://kubernetes.default.svc
+    - namespace: nginx-*            # wildcard namespace matching
+      server: https://kubernetes.default.svc
+
+  # ---- Cluster resource allow list ----
+  # Restricts which cluster-scoped resources Applications in this project can manage
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace            # allow creating namespaces
+    - group: "networking.k8s.io"
+      kind: IngressClass
+
+  # ---- Namespace resource allow/deny lists ----
+  # By default all namespace-scoped resources are allowed
+  # Deny specific dangerous resources:
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota        # prevent apps from creating their own quota
+
+  # ---- Roles within the project ----
+  # These map to ArgoCD RBAC policies
+  roles:
+    - name: developer
+      description: "Read-only access to sync status"
+      policies:
+        - p, proj:nginx-project:developer, applications, get, nginx-project/*, allow
+        - p, proj:nginx-project:developer, applications, sync, nginx-project/*, allow
+      groups:
+        - your-github-org:developers  # maps to a GitHub org team (with Dex SSO)
+
+  # ---- Sync windows — restrict when automated sync can run ----
+  # Allow syncs only during business hours (UTC)
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: "0 8 * * 1-5"   # weekdays 08:00 UTC
+  #     duration: 10h              # for 10 hours
+  #     applications:
+  #       - "*"
+  #     manualSync: true           # allow manual sync outside windows
+
+---
+# ==============================================================================
+# 2. APPLICATION — deploys nginx via Helm with automated sync
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-helm-demo
+  namespace: argocd
+  # Cascade deletion: when this Application is deleted, ArgoCD deletes all
+  # managed resources in the cluster. Remove this finalizer to retain resources.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  # Optional labels for organizing applications in the UI
+  labels:
+    app.kubernetes.io/name: nginx-helm-demo
+    environment: demo
+    team: platform
+spec:
+  # ---- Project this application belongs to ----
+  project: nginx-project
+
+  # ---- Source: where to get the application manifests / chart ----
+  source:
+    # Helm chart repository URL
+    repoURL: https://helm.nginx.com/stable
+    # Chart name
+    chart: nginx-ingress
+    # Chart version constraint — tracks latest patch release within 0.x
+    targetRevision: "0.x"
+
+    # ---- Helm-specific configuration ----
+    helm:
+      # Release name (defaults to Application name if not set)
+      releaseName: nginx-demo
+
+      # Values passed to the chart (equivalent to --set or -f values.yaml)
+      values: |
+        controller:
+          replicaCount: 1
+          image:
+            pullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          service:
+            type: ClusterIP
+          config:
+            entries:
+              proxy-connect-timeout: "10s"
+              proxy-read-timeout: "60s"
+
+      # Alternatively, reference a values file in a Git repo:
+      # valueFiles:
+      #   - values.yaml
+      #   - values-production.yaml
+
+      # Skip CRD installation (useful when CRDs are managed separately)
+      skipCrds: false
+
+      # Pass additional --set flags
+      # parameters:
+      #   - name: controller.replicaCount
+      #     value: "2"
+
+  # ---- Destination: cluster and namespace to deploy into ----
+  destination:
+    # In-cluster deployment (the cluster ArgoCD is running in)
+    server: https://kubernetes.default.svc
+    namespace: default
+    # For external clusters, use the cluster URL registered with ArgoCD:
+    # server: https://production-cluster.example.com:6443
+
+  # ---- Sync policy ----
+  syncPolicy:
+    # automated: {} means auto-sync is DISABLED — sync manually
+    # Enable for true GitOps behaviour:
+    automated:
+      # Delete resources from the cluster when they are removed from Git/Helm
+      # WARNING: set to false initially to avoid accidental deletions
+      prune: true
+
+      # Re-sync the app if cluster state drifts from the desired state
+      # This reverts any manual kubectl changes — be intentional about enabling this
+      selfHeal: true
+
+      # Never apply an empty set of resources (safety net)
+      allowEmpty: false
+
+    syncOptions:
+      # Create destination namespace if it does not exist
+      - CreateNamespace=true
+
+      # Validate manifests with kubectl --dry-run before applying
+      - Validate=true
+
+      # Apply resources in server-side apply mode (better for large objects)
+      - ServerSideApply=true
+
+      # Use foreground deletion propagation (delete children before parent)
+      - PrunePropagationPolicy=foreground
+
+      # Delete removed resources after all creates/updates (safer)
+      - PruneLast=true
+
+      # Apply only the diff, not all resources (reduces API server load)
+      - ApplyOutOfSyncOnly=true
+
+    # ---- Retry configuration ----
+    # ArgoCD will retry failed syncs with exponential backoff
+    retry:
+      limit: 5                  # maximum number of retries
+      backoff:
+        duration: 5s            # initial backoff
+        factor: 2               # backoff multiplier
+        maxDuration: 3m         # maximum backoff duration
+
+  # ---- Ignore differences ----
+  # Prevents ArgoCD from marking the app OutOfSync for expected runtime changes
+  ignoreDifferences:
+    # HPA manages replicas at runtime — ignore spec.replicas
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    # ArgoCD adds a tracking annotation — ignore it in the diff
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP      # assigned by Kubernetes, not in Helm values
+
+  # ---- Info links shown in the ArgoCD UI ----
+  info:
+    - name: Grafana Dashboard
+      value: https://grafana.example.com/d/nginx-dashboard
+    - name: Runbook
+      value: https://wiki.example.com/runbooks/nginx

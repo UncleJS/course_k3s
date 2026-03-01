@@ -1,0 +1,256 @@
+# =============================================================================
+# resource-quota.yaml — ResourceQuota and LimitRange demo
+# =============================================================================
+#
+# This file demonstrates:
+#   1. A dedicated namespace 'quota-demo'
+#   2. ResourceQuota constraining compute, object counts
+#   3. LimitRange providing container and pod defaults/bounds
+#   4. A sample Deployment that fits within the quota
+#   5. A commented-out Deployment that exceeds the quota (for testing)
+#
+# Apply:
+#   kubectl apply -f resource-quota.yaml
+#
+# Test quota enforcement:
+#   # View current usage:
+#   kubectl describe resourcequota quota-demo -n quota-demo
+#
+#   # Try to exceed the pod count (requires 11 pods — quota allows 10):
+#   kubectl scale deployment quota-ok-app --replicas=12 -n quota-demo
+#   # Expected: error — exceeded quota
+#
+#   # Clean up:
+#   kubectl delete namespace quota-demo
+# =============================================================================
+
+---
+# =============================================================================
+# 1. Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quota-demo
+  labels:
+    app.kubernetes.io/managed-by: course-k3s
+    module: "14"
+
+---
+# =============================================================================
+# 2. ResourceQuota
+# =============================================================================
+# Caps the TOTAL resource consumption across ALL pods in the namespace.
+#
+# Commands to inspect:
+#   kubectl get resourcequota -n quota-demo
+#   kubectl describe resourcequota quota-demo -n quota-demo
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-demo
+  namespace: quota-demo
+  labels:
+    app.kubernetes.io/name: quota-demo
+    app.kubernetes.io/component: quota
+spec:
+  hard:
+    # ---- Compute resources ----------------------------------------
+    # Total sum of requests.cpu for all pods in the namespace
+    requests.cpu: "2"
+    # Total sum of limits.cpu for all pods in the namespace
+    limits.cpu: "4"
+    # Total sum of requests.memory for all pods
+    requests.memory: 2Gi
+    # Total sum of limits.memory for all pods
+    limits.memory: 4Gi
+
+    # ---- Object counts --------------------------------------------
+    # Maximum number of pods (across all controllers)
+    pods: "10"
+    # Maximum number of Services
+    services: "5"
+    # Maximum number of PersistentVolumeClaims
+    persistentvolumeclaims: "3"
+    # Maximum number of ConfigMaps
+    configmaps: "10"
+    # Maximum number of Secrets (includes service account tokens)
+    secrets: "20"
+    # Disallow LoadBalancer services (uncomment to enforce)
+    # services.loadbalancers: "0"
+    # Disallow NodePort services
+    services.nodeports: "0"
+
+---
+# =============================================================================
+# 3. LimitRange
+# =============================================================================
+# Sets default requests/limits for containers that don't specify their own,
+# and enforces per-container and per-pod min/max bounds.
+#
+# Commands to inspect:
+#   kubectl describe limitrange quota-demo-limits -n quota-demo
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: quota-demo-limits
+  namespace: quota-demo
+  labels:
+    app.kubernetes.io/name: quota-demo
+    app.kubernetes.io/component: limitrange
+spec:
+  limits:
+    # ---- Container-level limits -----------------------------------
+    - type: Container
+      # Default LIMITS applied to containers that don't specify them
+      default:
+        cpu: "500m"
+        memory: "256Mi"
+      # Default REQUESTS applied to containers that don't specify them
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      # Maximum allowed per container (admission rejects anything higher)
+      max:
+        cpu: "2"
+        memory: "2Gi"
+      # Minimum allowed per container
+      min:
+        cpu: "10m"
+        memory: "16Mi"
+
+    # ---- Pod-level limits -----------------------------------------
+    # Applies to the SUM of all containers within a single pod
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: "4Gi"
+
+    # ---- PersistentVolumeClaim limits -----------------------------
+    # Uncomment to enforce storage size bounds:
+    # - type: PersistentVolumeClaim
+    #   max:
+    #     storage: 10Gi
+    #   min:
+    #     storage: 1Gi
+
+---
+# =============================================================================
+# 4. Deployment — fits within the quota
+# =============================================================================
+# This Deployment uses 3 replicas, each requesting 200m CPU / 128Mi memory.
+# Total: requests.cpu=600m (< 2), requests.memory=384Mi (< 2Gi) — ALLOWED.
+#
+# Commands to verify:
+#   kubectl rollout status deployment/quota-ok-app -n quota-demo
+#   kubectl top pods -n quota-demo
+#   kubectl describe resourcequota quota-demo -n quota-demo
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quota-ok-app
+  namespace: quota-demo
+  labels:
+    app: quota-ok-app
+    scenario: within-quota
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: quota-ok-app
+  template:
+    metadata:
+      labels:
+        app: quota-ok-app
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
+          # Simple health checks
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+---
+# =============================================================================
+# 5. Service for the valid Deployment
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: quota-ok-app
+  namespace: quota-demo
+  labels:
+    app: quota-ok-app
+spec:
+  selector:
+    app: quota-ok-app
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP   # NodePort is blocked by the quota above
+
+---
+# =============================================================================
+# 6. Deployment that EXCEEDS the quota — COMMENTED OUT for safety
+# =============================================================================
+# Uncomment this block to test quota enforcement.
+# This Deployment requests 4 CPUs total which exceeds the 2-CPU requests quota.
+# Expected error:
+#   Error from server (Forbidden): pods "quota-exceed-app-..." is forbidden:
+#   exceeded quota: quota-demo, requested: requests.cpu=1, used: requests.cpu=600m,
+#   limited: requests.cpu=2
+#
+# Test:
+#   kubectl apply -f resource-quota.yaml
+#   kubectl get events -n quota-demo | grep FailedCreate
+# =============================================================================
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: quota-exceed-app
+#   namespace: quota-demo
+#   labels:
+#     app: quota-exceed-app
+#     scenario: exceeds-quota
+# spec:
+#   replicas: 5
+#   selector:
+#     matchLabels:
+#       app: quota-exceed-app
+#   template:
+#     metadata:
+#       labels:
+#         app: quota-exceed-app
+#     spec:
+#       containers:
+#         - name: app
+#           image: nginx:alpine
+#           resources:
+#             requests:
+#               cpu: "800m"     # 5 × 800m = 4 CPU — exceeds limits.cpu: 2
+#               memory: "512Mi" # 5 × 512Mi = 2.5Gi — exceeds requests.memory: 2Gi
+#             limits:
+#               cpu: "1"
+#               memory: "1Gi"

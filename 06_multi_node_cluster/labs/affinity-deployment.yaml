@@ -1,0 +1,124 @@
+# affinity-deployment.yaml
+# Module 06 · Lab — Node Labels, Taints, and Affinity
+#
+# Demonstrates:
+#   - Pod anti-affinity: spread replicas across nodes
+#   - Preferred node affinity: prefer tier=compute nodes
+#   - Topology spread constraints: maxSkew=1 across nodes
+#
+# Setup:
+#   kubectl label node worker-01 tier=compute
+#   kubectl label node worker-02 tier=compute
+#   kubectl label node worker-03 tier=storage
+#
+# Apply:
+#   kubectl apply -f affinity-deployment.yaml
+#
+# Verify:
+#   kubectl get pods -o wide -l app=affinity-demo
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affinity-demo
+  labels:
+    app: affinity-demo
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: affinity-demo
+  template:
+    metadata:
+      labels:
+        app: affinity-demo
+    spec:
+      # ── Topology Spread: distribute evenly across nodes ──────────────────
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: affinity-demo
+
+      # ── Affinity rules ───────────────────────────────────────────────────
+      affinity:
+        # Prefer compute-tier nodes (soft rule)
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            preference:
+              matchExpressions:
+              - key: tier
+                operator: In
+                values:
+                - compute
+          - weight: 20
+            preference:
+              matchExpressions:
+              - key: tier
+                operator: In
+                values:
+                - storage
+
+        # Hard anti-affinity: no two replicas on the same node
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: affinity-demo
+            topologyKey: kubernetes.io/hostname
+
+      containers:
+      - name: affinity-demo
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+# ── Service ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: affinity-demo
+spec:
+  selector:
+    app: affinity-demo
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+# ── Dedicated-node demo: GPU taint toleration ─────────────────────────────────
+# Uncomment to test taint/toleration scheduling.
+# First apply the taint: kubectl taint node worker-01 dedicated=gpu:NoSchedule
+#
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: gpu-tolerating-pod
+# spec:
+#   tolerations:
+#   - key: "dedicated"
+#     operator: "Equal"
+#     value: "gpu"
+#     effect: "NoSchedule"
+#   nodeSelector:
+#     dedicated: gpu
+#   containers:
+#   - name: workload
+#     image: busybox
+#     command: ["sleep", "3600"]

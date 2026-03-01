@@ -1,0 +1,473 @@
+# compose-to-k3s.yaml
+# Module 16 — Lab: Kubernetes translation of podman-compose-example.yml
+#
+# This is the AFTER state — the complete hand-crafted Kubernetes manifest
+# equivalent of the three-tier Podman Compose "Taskr" application.
+#
+# Apply order (or apply the full file with kubectl apply -f compose-to-k3s.yaml):
+#   1. Namespace
+#   2. Secret
+#   3. PersistentVolumeClaims
+#   4. PostgreSQL StatefulSet + headless Service
+#   5. Redis Deployment + Service
+#   6. Web Deployment + Service
+#   7. IngressRoute (Traefik — replaces Caddy)
+#
+# Usage:
+#   # Create pull secret first:
+#   kubectl create secret docker-registry ghcr-creds \
+#     --docker-server=ghcr.io \
+#     --docker-username=myorg \
+#     --docker-password=<PAT> \
+#     -n taskr
+#
+#   kubectl apply -f compose-to-k3s.yaml
+
+# ════════════════════════════════════════════════
+# 1. Namespace
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taskr
+  labels:
+    app.kubernetes.io/part-of: taskr
+
+---
+# ════════════════════════════════════════════════
+# 2. Secrets
+#    WARNING: Do not commit real secrets to git.
+#    In production use SealedSecrets or External Secrets Operator.
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: Secret
+metadata:
+  name: taskr-secrets
+  namespace: taskr
+type: Opaque
+stringData:
+  postgres-user: taskr
+  postgres-password: "secretpassword"
+  postgres-db: taskr
+  session-secret: "my-super-secret"
+  # Connection strings reference k8s DNS names (service.namespace.svc.cluster.local)
+  database-url: "postgres://taskr:secretpassword@postgres.taskr.svc.cluster.local:5432/taskr"
+  redis-url: "redis://redis.taskr.svc.cluster.local:6379"
+
+---
+# ════════════════════════════════════════════════
+# 3. PersistentVolumeClaims
+#    Equivalent to Podman named volumes:
+#      pgdata   → postgres-data PVC
+#      redisdata → redis-data PVC
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: taskr
+  labels:
+    app: postgres
+    app.kubernetes.io/part-of: taskr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path    # k3s default storage class
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: taskr
+  labels:
+    app: redis
+    app.kubernetes.io/part-of: taskr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# ════════════════════════════════════════════════
+# 4a. PostgreSQL — headless Service (for StatefulSet)
+#     Replaces: Compose service "db" reachable as "db" on taskr-net
+#     Now reachable as: postgres.taskr.svc.cluster.local:5432
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: taskr
+  labels:
+    app: postgres
+    app.kubernetes.io/part-of: taskr
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  clusterIP: None    # Headless — required for StatefulSet stable DNS
+
+---
+# 4b. PostgreSQL — StatefulSet
+#     Uses a StatefulSet (not Deployment) for stable network identity
+#     and ordered, graceful pod management — appropriate for a database.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: taskr
+  labels:
+    app: postgres
+    app.kubernetes.io/part-of: taskr
+spec:
+  serviceName: postgres     # must match headless Service name above
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        app.kubernetes.io/part-of: taskr
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: postgres-db
+            # PGDATA must be a subdirectory; prevents "lost+found" permission issues
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+
+---
+# ════════════════════════════════════════════════
+# 5a. Redis — Service
+#     Replaces: Compose service "cache" reachable as "cache" on taskr-net
+#     Now reachable as: redis.taskr.svc.cluster.local:6379
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: taskr
+  labels:
+    app: redis
+    app.kubernetes.io/part-of: taskr
+spec:
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+
+---
+# 5b. Redis — Deployment
+#     Single replica with persistence via PVC.
+#     For high-availability Redis, see Redis Sentinel or Redis Cluster.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: taskr
+  labels:
+    app: redis
+    app.kubernetes.io/part-of: taskr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  strategy:
+    type: Recreate    # Recreate (not RollingUpdate) because PVC is ReadWriteOnce
+  template:
+    metadata:
+      labels:
+        app: redis
+        app.kubernetes.io/part-of: taskr
+    spec:
+      containers:
+        - name: redis
+          image: docker.io/library/redis:7-alpine
+          # Enable AOF persistence (matches Compose command)
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data
+
+---
+# ════════════════════════════════════════════════
+# 6a. Web — Service (ClusterIP)
+#     Internal only; Traefik IngressRoute handles external TLS traffic.
+# ════════════════════════════════════════════════
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: taskr
+  labels:
+    app: web
+    app.kubernetes.io/part-of: taskr
+spec:
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+
+---
+# 6b. Web — Deployment
+#     Two replicas for high availability.
+#     Replaces: Compose service "web" + resource limits.
+#     init container replaces "depends_on: db: condition: service_healthy".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: taskr
+  labels:
+    app: web
+    app.kubernetes.io/part-of: taskr
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: web
+        app.kubernetes.io/part-of: taskr
+    spec:
+      imagePullSecrets:
+        - name: ghcr-creds    # created separately (see file header)
+      # ── Init containers: wait for dependencies ───────────
+      initContainers:
+        - name: wait-for-postgres
+          image: docker.io/library/busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for PostgreSQL at postgres:5432..."
+              until nc -z postgres 5432; do
+                sleep 2
+              done
+              echo "PostgreSQL is ready."
+        - name: wait-for-redis
+          image: docker.io/library/busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Redis at redis:6379..."
+              until nc -z redis 6379; do
+                sleep 2
+              done
+              echo "Redis is ready."
+      # ── Main application container ───────────────────────
+      containers:
+        - name: web
+          image: ghcr.io/myorg/taskr-web:2.1.0
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3000"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: redis-url
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: taskr-secrets
+                  key: session-secret
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Mirrors Compose deploy.resources limits/reservations
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
+---
+# ════════════════════════════════════════════════
+# 7. IngressRoute (Traefik)
+#    Replaces: Compose service "proxy" (Caddy) + Caddyfile TLS config.
+#    Requires: cert-manager with a ClusterIssuer named "letsencrypt"
+#    See Module 07 for cert-manager setup.
+#
+#    External traffic flow:
+#      Internet → Traefik (port 443) → web Service (port 80) → web pods (port 3000)
+# ════════════════════════════════════════════════
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: taskr-web
+  namespace: taskr
+  labels:
+    app: web
+    app.kubernetes.io/part-of: taskr
+  annotations:
+    # Force HTTPS redirect
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`taskr.example.com`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+          namespace: taskr
+      services:
+        - name: web
+          port: 80
+  tls:
+    certResolver: letsencrypt
+
+---
+# Optional: security headers middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: taskr
+spec:
+  headers:
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    stsPreload: true
+    forceSTSHeader: true
+    frameDeny: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "same-origin"

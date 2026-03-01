@@ -1,0 +1,155 @@
+# ingress-basic.yaml
+# Module 07 · Lab — Traefik Ingress and IngressRoute
+#
+# Deploys a demo echo-server and exposes it via:
+#   1. Standard Kubernetes Ingress (path-based routing)
+#   2. Traefik IngressRoute CRD with middleware
+#
+# Prerequisites:
+#   - k3s with Traefik (default)
+#   - For TLS: replace example.com with your real domain + add cert-manager
+#
+# Apply:
+#   kubectl apply -f ingress-basic.yaml
+#
+# Test (replace NODE_IP with your server's IP):
+#   curl -H "Host: demo.example.com" http://<NODE_IP>/
+#   curl -H "Host: demo.example.com" http://<NODE_IP>/api/
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Namespace ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-demo
+---
+# ── Echo server Deployment ────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server
+  namespace: ingress-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: echo-server
+  template:
+    metadata:
+      labels:
+        app: echo-server
+    spec:
+      containers:
+      - name: echo
+        image: ealen/echo-server:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: PORT
+          value: "80"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+---
+# ── Service ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-server
+  namespace: ingress-demo
+spec:
+  selector:
+    app: echo-server
+  ports:
+  - port: 80
+    targetPort: 80
+---
+# ── Middleware: HTTPS redirect ────────────────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  namespace: ingress-demo
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# ── Middleware: Security headers ──────────────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: ingress-demo
+spec:
+  headers:
+    forceSTSHeader: true
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customResponseHeaders:
+      X-Frame-Options: DENY
+---
+# ── Standard Kubernetes Ingress ───────────────────────────────────────────────
+# Works with any Ingress controller (portable)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  namespace: ingress-demo
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: demo.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: echo-server
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: echo-server
+            port:
+              number: 80
+---
+# ── Traefik IngressRoute (native CRD, more features) ─────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: demo-ingressroute
+  namespace: ingress-demo
+spec:
+  entryPoints:
+  - web
+  routes:
+  # API path — higher priority
+  - match: Host(`demo.example.com`) && PathPrefix(`/api`)
+    kind: Rule
+    priority: 20
+    services:
+    - name: echo-server
+      port: 80
+
+  # Root path — catch-all
+  - match: Host(`demo.example.com`)
+    kind: Rule
+    priority: 10
+    middlewares:
+    - name: secure-headers
+    services:
+    - name: echo-server
+      port: 80

@@ -1,0 +1,151 @@
+# =============================================================================
+# debug-pod.yaml — General-purpose debug pod for Kubernetes troubleshooting
+# =============================================================================
+#
+# This pod provides a persistent debug environment with common tools
+# pre-installed. It runs 'sleep infinity' so it stays alive until deleted.
+#
+# Usage:
+#   # Deploy the debug pod:
+#   kubectl apply -f debug-pod.yaml
+#
+#   # Wait for it to be ready (tool installation takes ~30s):
+#   kubectl wait pod/debug-pod --for=condition=Ready --timeout=120s
+#
+#   # Open an interactive shell:
+#   kubectl exec -it debug-pod -- /bin/bash
+#
+#   # Run a one-off command:
+#   kubectl exec debug-pod -- curl -v http://my-service.my-namespace.svc.cluster.local/
+#
+#   # Clean up when done:
+#   kubectl delete pod debug-pod
+#
+# Useful commands inside the pod:
+#   curl -v http://<service>.<namespace>.svc.cluster.local/<path>
+#   wget -qO- http://<service>/
+#   nslookup <service>.<namespace>.svc.cluster.local
+#   dig <service>.<namespace>.svc.cluster.local
+#   nc -zv <host> <port>          # TCP connectivity test
+#   ping -c3 <host>               # ICMP test
+#   traceroute <host>             # Trace network path
+#   netstat -tlpn                 # List listening ports
+#   ss -tlpn                      # Alternative to netstat
+#   ip addr                       # Show network interfaces
+#   ip route                      # Show routing table
+#   env                           # Show environment variables
+#   cat /etc/resolv.conf          # Show DNS configuration
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+  # Change namespace as needed:
+  # namespace: my-app
+  labels:
+    app: debug-pod
+    purpose: troubleshooting
+  annotations:
+    description: "General-purpose debug pod — delete after use"
+spec:
+  # ---- Tolerations --------------------------------------------------------
+  # Allow this pod to run on any node, including control-plane nodes
+  tolerations:
+    - operator: Exists          # Tolerate ALL taints on any node
+      effect: NoSchedule
+    - operator: Exists
+      effect: NoExecute
+    - operator: Exists
+      effect: PreferNoSchedule
+
+  # ---- Node selection (optional) -----------------------------------------
+  # Uncomment to pin the pod to a specific node:
+  # nodeSelector:
+  #   kubernetes.io/hostname: worker-1
+
+  # ---- Container ----------------------------------------------------------
+  containers:
+    - name: debug
+      image: debian:bookworm-slim
+      # Alternative: ubuntu:22.04 for a larger but more familiar environment
+
+      # Install common debugging tools on startup
+      # This runs once; the pod stays alive until deleted
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "[debug-pod] Installing tools..."
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            curl \
+            wget \
+            netcat-openbsd \
+            dnsutils \
+            net-tools \
+            iputils-ping \
+            iproute2 \
+            traceroute \
+            tcpdump \
+            nmap \
+            jq \
+            vim \
+            less \
+            strace \
+            procps \
+            lsof \
+            htop \
+            ca-certificates \
+            openssl \
+          > /dev/null 2>&1
+          echo "[debug-pod] Tools installed. Pod is ready."
+          echo "[debug-pod] Run: kubectl exec -it debug-pod -- /bin/bash"
+          sleep infinity
+
+      # ---- Resources (lightweight — adjust as needed) -------------------
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+
+      # ---- Host /proc and /sys mounts (OPTIONAL — for node-level debugging)
+      # WARNING: Mounting /proc and /sys gives access to host kernel internals.
+      # Only enable this if you need to inspect node-level processes or sysctl.
+      # This requires the pod to run with elevated privileges (see securityContext).
+      # DO NOT enable in production or shared environments.
+      #
+      # volumeMounts:
+      #   - name: host-proc
+      #     mountPath: /host/proc
+      #     readOnly: true
+      #   - name: host-sys
+      #     mountPath: /host/sys
+      #     readOnly: true
+
+  # ---- Volumes for optional host filesystem access -----------------------
+  # volumes:
+  #   - name: host-proc
+  #     hostPath:
+  #       path: /proc
+  #   - name: host-sys
+  #     hostPath:
+  #       path: /sys
+
+  # ---- Security context (uncomment to enable privileged mode for /proc access)
+  # WARNING: Privileged pods have full access to the host kernel.
+  # Only enable when absolutely necessary for node debugging.
+  # securityContext:
+  #   privileged: true
+
+  # ---- Restart policy: Never so the pod doesn't restart after 'exit'
+  restartPolicy: Never
+
+  # ---- Prevent Kubernetes from injecting service account tokens
+  # (reduces attack surface since this pod is for debugging only)
+  automountServiceAccountToken: false

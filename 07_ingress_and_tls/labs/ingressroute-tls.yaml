@@ -1,0 +1,147 @@
+# ingressroute-tls.yaml
+# Module 07 · Lab — TLS IngressRoute with cert-manager certificate
+#
+# Prerequisites:
+#   1. cert-manager installed
+#   2. ClusterIssuers created (labs/cert-manager-issuer.yaml)
+#   3. DNS A record for myapp.example.com pointing to your cluster IP
+#   4. Port 80 accessible from the internet (for HTTP-01 challenge)
+#
+# Replace "myapp.example.com" and "you@example.com" with your real values.
+#
+# Apply:
+#   kubectl apply -f ingressroute-tls.yaml
+#
+# Watch certificate:
+#   kubectl get certificate -n tls-demo -w
+#
+# Test:
+#   curl https://myapp.example.com/
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Namespace ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tls-demo
+---
+# ── Demo application ──────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  namespace: tls-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+  namespace: tls-demo
+spec:
+  selector:
+    app: myapp
+  ports:
+  - port: 80
+    targetPort: 80
+---
+# ── cert-manager Certificate (explicit request) ───────────────────────────────
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: myapp-cert
+  namespace: tls-demo
+spec:
+  secretName: myapp-tls          # Traefik will reference this secret
+  issuerRef:
+    name: letsencrypt-staging    # Switch to letsencrypt-prod when ready
+    kind: ClusterIssuer
+  dnsNames:
+  - myapp.example.com            # Replace with your real domain
+  duration: 2160h                # 90 days
+  renewBefore: 360h              # Renew 15 days before expiry
+---
+# ── Middleware: HTTP → HTTPS redirect ─────────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  namespace: tls-demo
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# ── Middleware: Security headers ──────────────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: tls-demo
+spec:
+  headers:
+    forceSTSHeader: true
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+---
+# ── IngressRoute: HTTP (redirect to HTTPS) ────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: myapp-http
+  namespace: tls-demo
+spec:
+  entryPoints:
+  - web
+  routes:
+  - match: Host(`myapp.example.com`)
+    kind: Rule
+    middlewares:
+    - name: https-redirect
+    services:
+    - name: myapp
+      port: 80
+---
+# ── IngressRoute: HTTPS (main route) ─────────────────────────────────────────
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: myapp-https
+  namespace: tls-demo
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - match: Host(`myapp.example.com`)
+    kind: Rule
+    middlewares:
+    - name: secure-headers
+    services:
+    - name: myapp
+      port: 80
+  tls:
+    secretName: myapp-tls        # Populated by cert-manager

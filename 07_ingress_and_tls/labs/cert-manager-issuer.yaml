@@ -1,0 +1,85 @@
+# cert-manager-issuer.yaml
+# Module 07 · Lab — ClusterIssuers for Let's Encrypt (staging + production)
+#
+# Prerequisites:
+#   cert-manager installed:
+#     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+#
+# Instructions:
+#   1. Replace "you@example.com" with your real email address
+#   2. Apply staging issuer first for testing:
+#        kubectl apply -f cert-manager-issuer.yaml
+#   3. Once certs work with staging, switch to production ClusterIssuer
+#
+# Verify:
+#   kubectl get clusterissuer
+#   kubectl describe clusterissuer letsencrypt-staging
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Let's Encrypt Staging (for testing — certs NOT trusted by browsers) ───────
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Staging ACME directory — use this first!
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    # Your email address — used for expiry notifications
+    email: you@example.com        # ← CHANGE THIS
+    # Where to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+    # HTTP-01 challenge: Let's Encrypt visits /.well-known/acme-challenge/TOKEN
+    # Requires port 80 to be publicly accessible and DNS to resolve to cluster IP
+    - http01:
+        ingress:
+          class: traefik
+---
+# ── Let's Encrypt Production (browser-trusted certificates) ───────────────────
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: you@example.com        # ← CHANGE THIS
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+---
+# ── Let's Encrypt Production (DNS-01 for wildcards / private clusters) ─────────
+# Uncomment and configure if using Cloudflare for DNS.
+# Other DNS providers: https://cert-manager.io/docs/configuration/acme/dns01/
+#
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: cloudflare-api-token
+#   namespace: cert-manager
+# type: Opaque
+# stringData:
+#   api-token: "<your-cloudflare-zone-edit-api-token>"
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-prod-dns
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: you@example.com
+#     privateKeySecretRef:
+#       name: letsencrypt-prod-dns-key
+#     solvers:
+#     - dns01:
+#         cloudflare:
+#           email: you@example.com
+#           apiTokenSecretRef:
+#             name: cloudflare-api-token
+#             key: api-token

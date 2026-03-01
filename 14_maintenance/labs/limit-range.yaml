@@ -1,0 +1,244 @@
+# =============================================================================
+# limit-range.yaml — LimitRange demonstration with example Deployments
+# =============================================================================
+#
+# This file demonstrates:
+#   1. A dedicated namespace 'limits-demo'
+#   2. LimitRange with container and pod defaults, min, and max
+#   3. A Deployment using namespace defaults (no resources specified)
+#   4. A Deployment with explicit resource declarations
+#
+# Apply:
+#   kubectl apply -f limit-range.yaml
+#
+# Verification commands:
+#   # Inspect the LimitRange:
+#   kubectl describe limitrange limits-demo -n limits-demo
+#
+#   # Confirm defaults were injected into a pod:
+#   kubectl get pod -n limits-demo -l app=defaults-app -o jsonpath=\
+#     '{.items[0].spec.containers[0].resources}' | jq .
+#   # Expected: {"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"16Mi"}}
+#
+#   # Try to create a pod exceeding max limits:
+#   kubectl run too-big \
+#     --image=nginx:alpine \
+#     --requests='cpu=3,memory=3Gi' \
+#     --limits='cpu=4,memory=4Gi' \
+#     -n limits-demo
+#   # Expected: admission error — exceeds max container limits
+#
+#   # View resource usage:
+#   kubectl top pods -n limits-demo
+#
+#   # Clean up:
+#   kubectl delete namespace limits-demo
+# =============================================================================
+
+---
+# =============================================================================
+# 1. Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: limits-demo
+  labels:
+    app.kubernetes.io/managed-by: course-k3s
+    module: "14"
+
+---
+# =============================================================================
+# 2. LimitRange
+# =============================================================================
+# Applies default requests and limits to containers that don't specify them.
+# Also enforces minimum and maximum bounds for containers and pods.
+#
+# Key behaviour:
+#   - Container without resources: receives defaultRequest + default as limits
+#   - Container with only requests: limits are set to default if not specified
+#   - Container exceeding max: rejected at admission
+#   - Container below min: rejected at admission
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limits-demo
+  namespace: limits-demo
+  labels:
+    app.kubernetes.io/name: limits-demo
+    app.kubernetes.io/component: limitrange
+spec:
+  limits:
+    # ---- Container defaults and bounds ----------------------------
+    - type: Container
+      # DEFAULT LIMITS — applied when a container omits limits entirely
+      default:
+        cpu: "100m"
+        memory: "128Mi"
+      # DEFAULT REQUESTS — applied when a container omits requests entirely
+      defaultRequest:
+        cpu: "10m"
+        memory: "16Mi"
+      # MAXIMUM allowed per container (admission rejects if exceeded)
+      max:
+        cpu: "2"
+        memory: "2Gi"
+      # MINIMUM allowed per container (admission rejects if below)
+      min:
+        cpu: "5m"
+        memory: "8Mi"
+
+    # ---- Pod-level bounds ----------------------------------------
+    # Applies to the AGGREGATE of all containers within a single pod.
+    # A pod with 3 containers each using 1.5 CPU would be rejected (> 4 total).
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: "4Gi"
+
+---
+# =============================================================================
+# 3. Deployment — using namespace defaults (no resources specified)
+# =============================================================================
+# These pods will receive resources injected by the LimitRange above:
+#   requests: cpu=10m, memory=16Mi
+#   limits:   cpu=100m, memory=128Mi
+#
+# Verify injection:
+#   kubectl get pods -n limits-demo -l app=defaults-app \
+#     -o jsonpath='{.items[0].spec.containers[0].resources}' | jq .
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: defaults-app
+  namespace: limits-demo
+  labels:
+    app: defaults-app
+    scenario: using-defaults
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: defaults-app
+  template:
+    metadata:
+      labels:
+        app: defaults-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          # No 'resources:' block — LimitRange defaults will be applied
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+---
+# =============================================================================
+# 4. Deployment — explicit resource declarations
+# =============================================================================
+# These pods explicitly set their own resources.
+# Values must be within the LimitRange bounds:
+#   min cpu=5m, max cpu=2 → 250m is valid
+#   min memory=8Mi, max memory=2Gi → 256Mi is valid
+#
+# Verify pod QoS class (Burstable, since requests ≠ limits):
+#   kubectl get pods -n limits-demo -l app=explicit-app \
+#     -o jsonpath='{.items[0].status.qosClass}'
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: explicit-app
+  namespace: limits-demo
+  labels:
+    app: explicit-app
+    scenario: explicit-resources
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: explicit-app
+  template:
+    metadata:
+      labels:
+        app: explicit-app
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"      # Minimum CPU reserved on the node
+              memory: "64Mi"  # Minimum memory reserved on the node
+            limits:
+              cpu: "250m"     # Throttled at 250m — within max of 2
+              memory: "256Mi" # OOM-killed above 256Mi — within max of 2Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+---
+# =============================================================================
+# 5. Deployment — Guaranteed QoS (requests == limits)
+# =============================================================================
+# When requests exactly equal limits for ALL containers in the pod,
+# Kubernetes assigns the pod the Guaranteed QoS class — it is evicted last.
+#
+# Verify:
+#   kubectl get pods -n limits-demo -l app=guaranteed-app \
+#     -o jsonpath='{.items[0].status.qosClass}'
+#   # Expected: Guaranteed
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guaranteed-app
+  namespace: limits-demo
+  labels:
+    app: guaranteed-app
+    scenario: guaranteed-qos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guaranteed-app
+  template:
+    metadata:
+      labels:
+        app: guaranteed-app
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"     # Equal to requests → Guaranteed QoS
+              memory: "128Mi" # Equal to requests → Guaranteed QoS

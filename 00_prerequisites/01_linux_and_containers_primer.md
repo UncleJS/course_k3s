@@ -454,4 +454,4 @@ sudo ./prereq-check.sh
 
 ---
 
-*Licensed under [CC BY 4.0](../LICENSE.md) · © 2026 Mastering k3s Course Authors*
+*Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

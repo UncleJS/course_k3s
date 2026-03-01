@@ -1,0 +1,132 @@
+# podman-compose-example.yml
+# Module 16 — Lab: "Taskr" three-tier application
+#
+# This is the BEFORE state — a realistic Podman Compose file for a
+# Node.js web app + PostgreSQL + Redis stack.
+# Lesson 02 translates this file into Kubernetes manifests.
+# See compose-to-k3s.yaml for the AFTER state.
+
+version: "3.9"
+
+# ──────────────────────────────────────────────
+# Named volumes (equivalent to Kubernetes PVCs)
+# ──────────────────────────────────────────────
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+# ──────────────────────────────────────────────
+# Custom network (replaced by k8s cluster DNS)
+# ──────────────────────────────────────────────
+networks:
+  taskr-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
+
+# ──────────────────────────────────────────────
+# Services
+# ──────────────────────────────────────────────
+services:
+
+  # ─── PostgreSQL database ───────────────────
+  db:
+    image: docker.io/library/postgres:15-alpine
+    container_name: taskr-postgres
+    restart: unless-stopped
+    networks:
+      - taskr-net
+    environment:
+      POSTGRES_USER: taskr
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: taskr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "taskr", "-d", "taskr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # Not exposed externally — only reachable within taskr-net
+
+  # ─── Redis cache / session store ───────────
+  cache:
+    image: docker.io/library/redis:7-alpine
+    container_name: taskr-redis
+    restart: unless-stopped
+    networks:
+      - taskr-net
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Not exposed externally — only reachable within taskr-net
+
+  # ─── Node.js web application ────────────────
+  web:
+    image: myorg/taskr-web:2.1.0         # custom image — needs registry push
+    container_name: taskr-web
+    restart: unless-stopped
+    networks:
+      - taskr-net
+    ports:
+      - "3000:3000"                       # only exposed internally; Caddy handles TLS
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://taskr:secretpassword@db:5432/taskr
+      REDIS_URL: redis://cache:6379
+      SESSION_SECRET: my-super-secret
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # ─── Caddy reverse proxy / TLS termination ──
+  proxy:
+    image: docker.io/library/caddy:2-alpine
+    container_name: taskr-caddy
+    restart: unless-stopped
+    networks:
+      - taskr-net
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+# ──────────────────────────────────────────────
+# Extra Caddy volumes (not migrated to k3s —
+# replaced by Traefik IngressRoute + cert-manager)
+# ──────────────────────────────────────────────
+# volumes continued:
+#   caddy_data:
+#   caddy_config:

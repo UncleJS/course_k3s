@@ -1,0 +1,266 @@
+# Helm values for kube-prometheus-stack
+# Tuned for a small k3s cluster (1–5 nodes, limited resources)
+#
+# Install with:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm install kube-prometheus-stack \
+#     prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring \
+#     --create-namespace \
+#     --values prometheus-values.yaml
+
+# ==============================================================================
+# GLOBAL DEFAULT RULES
+# ==============================================================================
+defaultRules:
+  create: true
+  rules:
+    # Disable components that are not applicable to k3s
+    etcd: false                   # k3s uses embedded etcd with different certs
+    kubeControllerManager: false  # not exposed on the standard port in k3s
+    kubeScheduler: false          # not exposed on the standard port in k3s
+    kubeProxy: false              # k3s uses kube-proxy differently
+  disabled:
+    # These rules generate false positives on small/single-node clusters
+    KubeAPIErrorsHigh: true
+    KubeClientErrors: true
+    # Disable noisy watchdog alert (re-enable once Slack receiver is confirmed working)
+    # Watchdog: true
+
+# ==============================================================================
+# PROMETHEUS OPERATOR
+# ==============================================================================
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ==============================================================================
+# PROMETHEUS SERVER
+# ==============================================================================
+prometheus:
+  prometheusSpec:
+    # ---- Retention ----
+    retention: 30d          # keep 30 days of metrics
+    retentionSize: "8GiB"   # cap by size (applied first when both set)
+
+    # ---- Scrape intervals (increase to reduce load on small clusters) ----
+    scrapeInterval: "60s"
+    evaluationInterval: "60s"
+    scrapeTimeout: "30s"
+
+    # ---- Storage (persistent PVC using k3s local-path provisioner) ----
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path  # k3s built-in provisioner
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    # ---- Resource limits (suitable for small clusters) ----
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+    # ---- Service Monitor selector ----
+    # Only pick up ServiceMonitors with this label
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector:
+      matchLabels:
+        release: kube-prometheus-stack
+
+    # ---- Rule selector ----
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector:
+      matchLabels:
+        release: kube-prometheus-stack
+
+    # ---- Additional scrape configs (optional) ----
+    # additionalScrapeConfigs: []
+
+# ==============================================================================
+# ALERTMANAGER
+# ==============================================================================
+alertmanager:
+  alertmanagerSpec:
+    # ---- Storage for Alertmanager state (silences, notification log) ----
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  # ---- Alertmanager configuration ----
+  # See also labs/alertmanager-config.yaml for a full inline config example
+  config:
+    global:
+      resolve_timeout: 5m
+      # Slack webhook URL — replace with your actual webhook
+      # slack_api_url: "https://hooks.slack.com/services/T.../B.../..."
+
+    route:
+      receiver: "null"            # default: discard (change to slack-warnings once configured)
+      group_by: [namespace, alertname, severity]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 6h
+      routes:
+        # Critical alerts → Slack #alerts-critical channel
+        - matchers:
+            - severity = "critical"
+          receiver: "null"        # Replace with: slack-critical
+          continue: true
+
+        # Watchdog (always-firing heartbeat) → discard
+        - matchers:
+            - alertname = "Watchdog"
+          receiver: "null"
+
+    receivers:
+      - name: "null"
+      # Uncomment and configure once Slack webhook is available:
+      # - name: slack-warnings
+      #   slack_configs:
+      #     - channel: "#alerts"
+      #       send_resolved: true
+      #       title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+      #       text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+      # - name: slack-critical
+      #   slack_configs:
+      #     - channel: "#alerts-critical"
+      #       send_resolved: true
+
+    inhibit_rules:
+      - source_matchers:
+          - severity = "critical"
+        target_matchers:
+          - severity = "warning"
+        equal: [namespace, alertname]
+
+# ==============================================================================
+# GRAFANA
+# ==============================================================================
+grafana:
+  enabled: true
+
+  # ---- Admin credentials ----
+  adminUser: admin
+  adminPassword: "admin123"        # Change in production! Use a Secret reference instead.
+
+  # ---- Persistent storage for dashboards, datasources, and settings ----
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+  # ---- Resource limits ----
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # ---- Service: expose via NodePort for direct access ----
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30300        # access at http://<node-ip>:30300
+
+  # ---- Grafana configuration ----
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+    auth.anonymous:
+      enabled: false         # disable anonymous access
+    security:
+      allow_embedding: false
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+
+  # ---- Pre-install dashboards as sidecar ConfigMaps ----
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
+    datasources:
+      enabled: true
+
+# ==============================================================================
+# NODE EXPORTER
+# ==============================================================================
+nodeExporter:
+  enabled: true
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 30Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  # Tolerate all taints so exporter runs on all nodes including masters
+  tolerations:
+    - operator: Exists
+
+# ==============================================================================
+# KUBE STATE METRICS
+# ==============================================================================
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# ==============================================================================
+# DISABLED COMPONENTS (k3s-specific)
+# ==============================================================================
+
+# k3s uses an embedded etcd with self-signed certs at a non-standard path
+# Enabling this causes persistent scrape errors
+kubeEtcd:
+  enabled: false
+
+# k3s does not expose the controller-manager metrics endpoint by default
+kubeControllerManager:
+  enabled: false
+
+# k3s does not expose the scheduler metrics endpoint by default
+kubeScheduler:
+  enabled: false
+
+# kube-proxy metrics are not typically needed on k3s (uses iptables/nftables)
+kubeProxy:
+  enabled: false

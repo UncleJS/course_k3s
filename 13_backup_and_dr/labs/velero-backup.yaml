@@ -1,0 +1,272 @@
+# =============================================================================
+# velero-backup.yaml — Velero Backup, Schedule, Restore, and BSL examples
+# =============================================================================
+#
+# Prerequisites:
+#   1. Install the Velero CLI:
+#      VELERO_VERSION=v1.13.2
+#      curl -fsSL \
+#        "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" \
+#        | tar xz --strip-components=1 -C /usr/local/bin \
+#            velero-${VELERO_VERSION}-linux-amd64/velero
+#
+#   2. Install Velero into the cluster (with MinIO as object store):
+#      cat > /tmp/velero-creds <<EOF
+#      [default]
+#      aws_access_key_id=minioadmin
+#      aws_secret_access_key=minioadmin
+#      EOF
+#
+#      velero install \
+#        --provider aws \
+#        --plugins velero/velero-plugin-for-aws:v1.9.0 \
+#        --bucket velero-backups \
+#        --secret-file /tmp/velero-creds \
+#        --backup-location-config \
+#          region=minio,s3ForcePathStyle=true,s3Url=http://minio.minio-system:9000 \
+#        --use-node-agent \
+#        --default-volumes-to-fs-backup
+#      rm /tmp/velero-creds
+#
+#   3. Verify installation:
+#      kubectl get pods -n velero
+#      velero backup-location get
+#
+# Apply all resources in this file:
+#   kubectl apply -f velero-backup.yaml
+# =============================================================================
+
+---
+# =============================================================================
+# 1. BackupStorageLocation — MinIO (self-hosted S3-compatible)
+# =============================================================================
+# This tells Velero where to store backup artifacts.
+# Change the s3Url and credentials Secret to match your environment.
+#
+# Verify: velero backup-location get
+# =============================================================================
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: backup-storage-location
+spec:
+  provider: aws
+  objectStorage:
+    bucket: velero-backups
+    prefix: prod-cluster/           # Organise backups by cluster name
+  config:
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: http://minio.minio-system:9000
+    # For AWS S3 (comment out the three lines above and uncomment below):
+    # region: us-east-1
+  # Credentials stored in a Kubernetes Secret:
+  credential:
+    name: velero-s3-credentials     # kubectl create secret generic velero-s3-credentials ...
+    key: cloud
+  accessMode: ReadWrite
+
+---
+# =============================================================================
+# 2. VolumeSnapshotLocation — (optional, for CSI or cloud volume snapshots)
+# =============================================================================
+# Only needed if you are using CSI volume snapshots instead of Restic/Kopia
+# file-system backup for PVC data. For most k3s on-prem setups, you can
+# skip this and rely on node-agent (Restic/Kopia) instead.
+#
+# Uncomment and adapt if needed:
+# =============================================================================
+# apiVersion: velero.io/v1
+# kind: VolumeSnapshotLocation
+# metadata:
+#   name: default
+#   namespace: velero
+# spec:
+#   provider: aws
+#   config:
+#     region: us-east-1
+
+---
+# =============================================================================
+# 3. Backup — Back up the 'default' namespace with PVC data
+# =============================================================================
+# Creates a one-shot backup of the 'default' namespace.
+# PVC data is backed up via Restic/Kopia (node-agent must be running).
+#
+# Apply: kubectl apply -f velero-backup.yaml
+# Monitor: velero backup describe default-namespace-backup --details
+#          velero backup logs default-namespace-backup
+# =============================================================================
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: default-namespace-backup
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    backup-type: on-demand
+  annotations:
+    # Restic/Kopia annotation — include all volumes in this backup
+    # (alternative: annotate individual PVCs or Pods)
+    backup.velero.io/backup-volumes-excludes: ""
+spec:
+  # ---- Namespace scope ------------------------------------------------
+  includedNamespaces:
+    - default
+  # Uncomment to also back up cluster-scoped resources referenced by
+  # the namespaced resources (e.g. ClusterRoles, StorageClasses):
+  # includeClusterResources: true
+
+  # ---- Resource filters -----------------------------------------------
+  # Exclude noisy resources that can be recreated from events or endpoints
+  excludedResources:
+    - events
+    - events.events.k8s.io
+    - endpoints        # recreated automatically from Services
+    - endpointslices.discovery.k8s.io
+
+  # ---- Label selector (optional) --------------------------------------
+  # Back up only resources with this label:
+  # labelSelector:
+  #   matchLabels:
+  #     backup: "true"
+
+  # ---- Storage --------------------------------------------------------
+  storageLocation: default          # References the BSL above
+  ttl: 168h                         # Retain this backup for 7 days
+
+  # ---- Volume data ----------------------------------------------------
+  # true = use node-agent (Restic/Kopia) to back up PVC contents
+  defaultVolumesToFsBackup: true
+
+  # ---- Pre/post hooks (optional) --------------------------------------
+  # Quiesce a database before backup for consistency:
+  hooks:
+    resources:
+      - name: postgres-checkpoint
+        includedNamespaces:
+          - default
+        labelSelector:
+          matchLabels:
+            app: postgres
+        pre:
+          - exec:
+              container: postgres
+              command:
+                - /bin/bash
+                - -c
+                - psql -U postgres -c "CHECKPOINT;"
+              onError: Fail
+              timeout: 60s
+
+---
+# =============================================================================
+# 4. Schedule — Daily backup with 7-day retention
+# =============================================================================
+# Runs a backup every day at 02:00 UTC.
+# Backs up all namespaces except system ones.
+#
+# Verify: velero schedule get
+# Manually trigger: velero backup create --from-schedule daily-full-backup
+# =============================================================================
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-full-backup
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    backup-type: scheduled
+spec:
+  # Standard cron format: minute hour day-of-month month day-of-week
+  schedule: "0 2 * * *"
+
+  # Pause the schedule without deleting it:
+  # paused: false
+
+  template:
+    # ---- Namespace scope ----------------------------------------------
+    includedNamespaces:
+      - "*"           # All namespaces …
+    excludedNamespaces:
+      - kube-system   # … except system namespaces
+      - kube-public
+      - kube-node-lease
+      - velero        # Don't back up Velero's own objects
+
+    # ---- Resource filters --------------------------------------------
+    excludedResources:
+      - events
+      - events.events.k8s.io
+      - endpoints
+      - endpointslices.discovery.k8s.io
+
+    # ---- Storage / retention ----------------------------------------
+    storageLocation: default
+    ttl: 168h                   # 7 days — adjust to your RPO requirements
+
+    # ---- Volume data ------------------------------------------------
+    defaultVolumesToFsBackup: true
+
+    # ---- Labels applied to each generated Backup object -------------
+    labels:
+      backup-schedule: daily-full-backup
+      environment: production
+
+---
+# =============================================================================
+# 5. Restore — Restore the 'default' namespace from the backup above
+# =============================================================================
+# Restore the entire 'default' namespace from the named backup.
+#
+# Apply: kubectl apply -f velero-backup.yaml   (or create via CLI)
+# CLI equivalent:
+#   velero restore create default-ns-restore \
+#     --from-backup default-namespace-backup \
+#     --include-namespaces default
+#
+# Monitor: velero restore describe default-ns-restore --details
+#          velero restore logs default-ns-restore
+# =============================================================================
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: default-ns-restore
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    restore-type: namespace
+spec:
+  # The name of the Backup resource to restore from
+  backupName: default-namespace-backup
+
+  # ---- Namespace scope ----------------------------------------------
+  includedNamespaces:
+    - default
+
+  # Optional namespace mapping — restore into a different namespace:
+  # namespaceMapping:
+  #   default: default-restored
+
+  # ---- Resource filters --------------------------------------------
+  excludedResources:
+    - nodes
+    - events
+    - persistentvolumes   # Let the StorageClass re-provision dynamically
+
+  # ---- Volume data -------------------------------------------------
+  # Restore PVC data that was captured by Restic/Kopia:
+  restorePVs: true
+
+  # ---- Conflict policy ---------------------------------------------
+  # What to do if a resource already exists in the cluster:
+  # Options: none (skip existing), update
+  existingResourcePolicy: none
+
+  # ---- Hooks (optional) -------------------------------------------
+  # hooks:
+  #   resources: []

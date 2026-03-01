@@ -1,0 +1,42 @@
+# values-override.yaml
+# Module 08 · Lab — Helm Values Override
+#
+# Use with: helm install demo labs/mychart --values labs/values-override.yaml
+# Or with:  helm install nginx-demo bitnami/nginx --values labs/values-override.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: "alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 80
+
+ingress:
+  enabled: false
+  className: traefik
+  host: demo.example.com     # Replace with your domain
+  tls: false
+  tlsSecret: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+config:
+  logLevel: info
+  appPort: 80

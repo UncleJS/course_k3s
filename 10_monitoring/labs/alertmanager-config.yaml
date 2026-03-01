@@ -1,0 +1,375 @@
+# Alertmanager configuration and custom PrometheusRules for k3s
+# Apply with: kubectl apply -f alertmanager-config.yaml
+#
+# This file contains:
+#   1. A Secret with the full Alertmanager configuration (Slack + email)
+#   2. A PrometheusRule with custom alert rules for common k3s failure scenarios
+
+# ==============================================================================
+# 1. ALERTMANAGER CONFIG SECRET
+# ==============================================================================
+# The Prometheus Operator reads this Secret and mounts it into the Alertmanager pod.
+# The Secret name MUST follow the pattern:
+#   alertmanager-<prometheus-release-name>-alertmanager
+#
+# If you installed with: helm install kube-prometheus-stack ...
+# Then the secret name is: alertmanager-kube-prometheus-stack-alertmanager
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-kube-prometheus-stack-alertmanager
+  namespace: monitoring
+type: Opaque
+stringData:
+  alertmanager.yaml: |
+    # ==================================================================
+    # GLOBAL DEFAULTS
+    # ==================================================================
+    global:
+      # Default time to wait before declaring an alert resolved
+      resolve_timeout: 5m
+
+      # Slack webhook URL — replace with your actual Incoming Webhook URL
+      # Create one at: https://api.slack.com/messaging/webhooks
+      slack_api_url: "https://hooks.slack.com/services/TXXXXXXXX/BXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXX"
+
+      # SMTP settings for email notifications
+      smtp_smarthost: "smtp.example.com:587"
+      smtp_from: "alertmanager@example.com"
+      smtp_auth_username: "alertmanager@example.com"
+      smtp_auth_password: "SMTP_PASSWORD_PLACEHOLDER"
+      smtp_require_tls: true
+
+    # ==================================================================
+    # TEMPLATES (optional — for rich Slack messages)
+    # ==================================================================
+    templates:
+      - /etc/alertmanager/config/*.tmpl
+
+    # ==================================================================
+    # ROUTING TREE
+    # ==================================================================
+    route:
+      # Default receiver — catches alerts not matched by child routes
+      receiver: slack-warnings
+
+      # Group alerts with the same namespace, alertname, and severity into
+      # a single notification to reduce spam
+      group_by: [namespace, alertname, severity]
+
+      # Wait 30s after first alert in a group before sending (collect related alerts)
+      group_wait: 30s
+
+      # Wait 5m before sending a new notification for an ongoing group
+      group_interval: 5m
+
+      # Re-send notification every 4h if alert is still firing
+      repeat_interval: 4h
+
+      routes:
+        # ----------------------------------------------------------------
+        # Watchdog alert — always fires as a heartbeat; discard it
+        # ----------------------------------------------------------------
+        - matchers:
+            - alertname = "Watchdog"
+          receiver: "null"
+
+        # ----------------------------------------------------------------
+        # Critical alerts → Slack #alerts-critical AND email
+        # continue: true means the alert also falls through to next routes
+        # ----------------------------------------------------------------
+        - matchers:
+            - severity = "critical"
+          receiver: slack-critical
+          group_wait: 10s           # respond faster to critical alerts
+          repeat_interval: 1h       # remind every hour while critical
+          continue: true            # also match next routes
+
+        # ----------------------------------------------------------------
+        # Critical alerts → email in addition to Slack
+        # (only matches because continue: true on the route above)
+        # ----------------------------------------------------------------
+        - matchers:
+            - severity = "critical"
+          receiver: email-critical
+
+        # ----------------------------------------------------------------
+        # Warning alerts → Slack #alerts channel (already the default,
+        # but listed explicitly for clarity)
+        # ----------------------------------------------------------------
+        - matchers:
+            - severity = "warning"
+          receiver: slack-warnings
+
+    # ==================================================================
+    # RECEIVERS
+    # ==================================================================
+    receivers:
+      # Discard receiver — used for Watchdog and other noise alerts
+      - name: "null"
+
+      # ------------------------------------------------------------------
+      # Slack — #alerts channel (warnings)
+      # ------------------------------------------------------------------
+      - name: slack-warnings
+        slack_configs:
+          - channel: "#alerts"
+            username: "Alertmanager"
+            icon_emoji: ":warning:"
+            send_resolved: true
+            title: |
+              [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}]
+              {{ .CommonLabels.alertname }} — {{ .CommonLabels.namespace }}
+            text: |
+              {{ range .Alerts }}
+              *Summary:* {{ .Annotations.summary }}
+              *Severity:* {{ .Labels.severity }}
+              *Namespace:* {{ .Labels.namespace }}
+              {{ if .Annotations.description }}*Details:* {{ .Annotations.description }}{{ end }}
+              {{ if .Annotations.runbook }}*Runbook:* {{ .Annotations.runbook }}{{ end }}
+              ---
+              {{ end }}
+
+      # ------------------------------------------------------------------
+      # Slack — #alerts-critical channel (critical only)
+      # ------------------------------------------------------------------
+      - name: slack-critical
+        slack_configs:
+          - channel: "#alerts-critical"
+            username: "Alertmanager"
+            icon_emoji: ":fire:"
+            send_resolved: true
+            title: |
+              :fire: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}]
+              {{ .CommonLabels.alertname }} — {{ .CommonLabels.namespace }}
+            text: |
+              {{ range .Alerts }}
+              *Summary:* {{ .Annotations.summary }}
+              *Severity:* :red_circle: {{ .Labels.severity | toUpper }}
+              *Namespace:* {{ .Labels.namespace }}
+              *Pod:* {{ .Labels.pod }}
+              {{ if .Annotations.description }}*Details:* {{ .Annotations.description }}{{ end }}
+              {{ if .Annotations.runbook }}*Runbook:* <{{ .Annotations.runbook }}|Click here>{{ end }}
+              ---
+              {{ end }}
+
+      # ------------------------------------------------------------------
+      # Email — critical alerts only
+      # ------------------------------------------------------------------
+      - name: email-critical
+        email_configs:
+          - to: "oncall@example.com"
+            send_resolved: true
+            html: |
+              <h2 style="color:{{ if eq .Status "firing" }}red{{ else }}green{{ end }}">
+                [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}
+              </h2>
+              <p><b>Namespace:</b> {{ .CommonLabels.namespace }}</p>
+              {{ range .Alerts }}
+              <hr/>
+              <p><b>Summary:</b> {{ .Annotations.summary }}</p>
+              <p><b>Description:</b> {{ .Annotations.description }}</p>
+              {{ if .Annotations.runbook }}
+              <p><a href="{{ .Annotations.runbook }}">View Runbook</a></p>
+              {{ end }}
+              {{ end }}
+            headers:
+              Subject: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} in {{ .CommonLabels.namespace }}'
+
+    # ==================================================================
+    # INHIBITION RULES
+    # ==================================================================
+    inhibit_rules:
+      # Suppress WARNING alerts when a CRITICAL alert fires for the same
+      # namespace and alertname — avoids double notification
+      - source_matchers:
+          - severity = "critical"
+        target_matchers:
+          - severity = "warning"
+        equal:
+          - namespace
+          - alertname
+
+      # Suppress pod-level alerts when the node is down
+      # (the node failure is the root cause, not the pods)
+      - source_matchers:
+          - alertname = "NodeDown"
+        target_matchers:
+          - alertname =~ "PodCrashLooping|ContainerOOMKilled|DeploymentNotAvailable"
+        equal:
+          - node
+
+---
+# ==============================================================================
+# 2. CUSTOM PROMETHEUSRULE
+# ==============================================================================
+# The Prometheus Operator picks this up automatically because of the
+# "release: kube-prometheus-stack" label matching the ruleSelector.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: k3s-custom-rules
+  namespace: monitoring
+  labels:
+    # This label MUST match the Prometheus ruleSelector
+    release: kube-prometheus-stack
+    app: kube-prometheus-stack
+spec:
+  groups:
+    # ----------------------------------------------------------------
+    # Node-level alerts
+    # ----------------------------------------------------------------
+    - name: node.alerts
+      rules:
+        - alert: HighNodeCPUUsage
+          expr: |
+            100 - (
+              avg by (instance) (
+                rate(node_cpu_seconds_total{mode="idle"}[5m])
+              ) * 100
+            ) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on {{ $labels.instance }}"
+            description: >
+              Node {{ $labels.instance }} CPU usage is {{ $value | humanize }}%
+              (threshold: 80%). Sustained for 5 minutes.
+            runbook: "https://wiki.example.com/runbooks/high-cpu"
+
+        - alert: CriticalNodeCPUUsage
+          expr: |
+            100 - (
+              avg by (instance) (
+                rate(node_cpu_seconds_total{mode="idle"}[5m])
+              ) * 100
+            ) > 95
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Critical CPU usage on {{ $labels.instance }}"
+            description: >
+              Node {{ $labels.instance }} CPU usage is {{ $value | humanize }}%
+              (threshold: 95%). Node may be unresponsive.
+            runbook: "https://wiki.example.com/runbooks/high-cpu"
+
+        - alert: NodeMemoryPressure
+          expr: |
+            (
+              node_memory_MemAvailable_bytes /
+              node_memory_MemTotal_bytes
+            ) * 100 < 10
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Low memory available on {{ $labels.instance }}"
+            description: >
+              Node {{ $labels.instance }} has only {{ $value | humanize }}%
+              memory available (threshold: 10%).
+            runbook: "https://wiki.example.com/runbooks/memory-pressure"
+
+        - alert: NodeDiskUsageHigh
+          expr: |
+            (
+              node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+              - node_filesystem_free_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+            )
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+            * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Disk usage high on {{ $labels.instance }}"
+            description: >
+              Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }}
+              is {{ $value | humanize }}% full.
+            runbook: "https://wiki.example.com/runbooks/disk-full"
+
+        - alert: NodeDiskUsageCritical
+          expr: |
+            (
+              node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+              - node_filesystem_free_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+            )
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+            * 100 > 95
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Disk almost full on {{ $labels.instance }}"
+            description: >
+              Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }}
+              is {{ $value | humanize }}% full. Immediate action required.
+            runbook: "https://wiki.example.com/runbooks/disk-full"
+
+    # ----------------------------------------------------------------
+    # Pod / workload alerts
+    # ----------------------------------------------------------------
+    - name: pod.alerts
+      rules:
+        - alert: PodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crashlooping"
+            description: >
+              Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }}
+              has restarted {{ $value | humanize }} times in the last 15 minutes.
+            runbook: "https://wiki.example.com/runbooks/crashloop"
+
+        - alert: PodNotReady
+          expr: |
+            kube_pod_status_ready{condition="false", namespace!="kube-system"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+            description: >
+              Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+              has been in a not-ready state for more than 10 minutes.
+            runbook: "https://wiki.example.com/runbooks/pod-not-ready"
+
+        - alert: DeploymentNotAvailable
+          expr: |
+            (
+              kube_deployment_status_replicas_available
+              / kube_deployment_spec_replicas
+            ) < 0.5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} degraded"
+            description: >
+              Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }}
+              has fewer than 50% replicas available.
+              Available: {{ $value | humanizePercentage }}.
+            runbook: "https://wiki.example.com/runbooks/deployment-degraded"
+
+        - alert: PVCAlmostFull
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes
+              / kubelet_volume_stats_capacity_bytes
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is {{ $value | humanize }}% full"
+            description: >
+              PersistentVolumeClaim {{ $labels.persistentvolumeclaim }}
+              in namespace {{ $labels.namespace }} is {{ $value | humanize }}% full.
+            runbook: "https://wiki.example.com/runbooks/pvc-full"
