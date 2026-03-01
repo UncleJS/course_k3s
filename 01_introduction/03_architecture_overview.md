@@ -274,7 +274,7 @@ flowchart TD
     SC[StorageClass\nlocal-path]
     PROV[local-path-provisioner]
     PV[PersistentVolume]
-    DIR["/opt/local-path-provisioner/<uuid>"\non node filesystem"]
+    DIR["/opt/local-path-provisioner/uuid\non node filesystem"]
 
     POD --> PVC
     PVC --> SC

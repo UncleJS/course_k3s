@@ -117,7 +117,7 @@ spec:
 # 3a. HELMREPOSITORY — Helm chart repository source
 # ==============================================================================
 # The source-controller fetches the Helm repository index and caches it.
-apiVersion: source.toolkit.fluxcd.io/v1beta2
+apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
   name: nginx-stable
@@ -139,7 +139,7 @@ spec:
 # ==============================================================================
 # The helm-controller runs helm upgrade --install for this release.
 # Changes to 'values' or chart version trigger an automatic upgrade.
-apiVersion: helm.toolkit.fluxcd.io/v2beta2
+apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: nginx

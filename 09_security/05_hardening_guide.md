@@ -75,7 +75,7 @@ tar xzf kube-bench.tar.gz
 
 # Run with k3s profile
 sudo ./kube-bench --config-dir cfg --config cfg/config.yaml \
-  --benchmark rke-cis-1.7    # closest to k3s; or use 'k3s' if available
+  --benchmark k3s-cis-1.24    # native k3s benchmark (kube-bench v0.7+)
 ```
 
 ### CIS check categories
@@ -733,9 +733,8 @@ curl -Lo kube-bench.tar.gz \
 tar xzf kube-bench.tar.gz
 sudo install -m 755 kube-bench /usr/local/bin/
 
-# Run against k3s (use 'k3s' profile if available, else rke-cis-1.7)
-sudo kube-bench --benchmark rke-cis-1.7 2>/dev/null || \
-  sudo kube-bench
+# Run against k3s using the native k3s benchmark (kube-bench v0.7+)
+sudo kube-bench --benchmark k3s-cis-1.24
 
 # Apply the hardening configuration to k3s
 # (Review each flag carefully before applying to production)

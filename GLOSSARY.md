@@ -147,7 +147,7 @@ A Kubernetes workload object that runs one or more pods to completion (rather th
 ## K
 
 **k3s**
-A lightweight, certified Kubernetes distribution by Rancher Labs (now SUSE). k3s packages the entire Kubernetes control plane into a single binary (`< 70 MB`), replaces etcd with SQLite, bundles Traefik, Flannel, and local-path-provisioner, and is designed for edge, IoT, and resource-constrained environments. See [Module 01 – Introduction](01_introduction/).
+A lightweight, certified Kubernetes distribution by Rancher Labs (now SUSE). k3s packages the entire Kubernetes control plane into a single binary (`< 100 MB`), replaces etcd with SQLite, bundles Traefik, Flannel, and local-path-provisioner, and is designed for edge, IoT, and resource-constrained environments. See [Module 01 – Introduction](01_introduction/).
 
 **kubeconfig**
 A YAML file that stores cluster connection details, credentials, and context. `kubectl` reads `~/.kube/config` by default. k3s writes its kubeconfig to `/etc/rancher/k3s/k3s.yaml`. See [Module 02 – Installation](02_installation/).

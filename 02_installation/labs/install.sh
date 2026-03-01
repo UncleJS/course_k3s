@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — k3s single-node installation lab script
 # Module 02 · Lab | Course: Mastering k3s
-# Licensed under CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+# Licensed under CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 set -euo pipefail
 

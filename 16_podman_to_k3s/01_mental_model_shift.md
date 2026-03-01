@@ -338,7 +338,7 @@ The patterns are strikingly similar — the Kubernetes version adds scheduling, 
 
 | Podman Feature | Status in k3s | Workaround |
 |---------------|---------------|------------|
-| Rootless containers | ✅ k3s supports rootless mode | `INSTALL_K3S_EXEC="--rootless"` |
+| Rootless containers | ✅ k3s supports rootless mode | Run installer as non-root: `curl -sfL https://get.k3s.io | sh -` (rootless mode activates automatically for non-root users) |
 | `podman build` (image builds) | ❌ Not in k3s | Use Buildah / Podman on a build host; push to registry |
 | `podman play kube` | N/A (k3s is the "play") | Use `kubectl apply` |
 | `podman generate systemd` | N/A | Quadlet is replaced by k3s service management |
