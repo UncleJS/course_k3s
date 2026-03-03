@@ -8,8 +8,8 @@
 - [Installation Methods](#installation-methods)
 - [Method 1: Official Installer Script](#method-1-official-installer-script)
 - [Method 2: Manual Binary Install](#method-2-manual-binary-install)
-- [Verify the Installation](#verify-the-installation)
 - [Configure kubectl Access](#configure-kubectl-access)
+- [Verify the Installation](#verify-the-installation)
 - [Deploy Your First App](#deploy-your-first-app)
 - [Uninstalling k3s](#uninstalling-k3s)
 - [Common Pitfalls](#common-pitfalls)
@@ -130,7 +130,7 @@ flowchart TD
 
 ```bash
 # In a second terminal, watch the service come up
-sudo journalctl -u k3s -f
+journalctl -u k3s -f
 ```
 
 Expected output:
@@ -202,41 +202,6 @@ sudo systemctl start k3s
 
 ---
 
-## Verify the Installation
-
-```bash
-# Check service status
-sudo systemctl status k3s
-
-# Check k3s version
-k3s --version
-sudo kubectl version
-
-# Check node is Ready
-sudo kubectl get nodes
-# Expected:
-# NAME         STATUS   ROLES                  AGE   VERSION
-# my-server    Ready    control-plane,master   1m    YOUR_K3S_VERSION
-
-# Check all system pods are Running
-sudo kubectl get pods -n kube-system
-# Expected: coredns, traefik, local-path-provisioner, metrics-server all Running
-
-# Check cluster info
-sudo kubectl cluster-info
-# Expected:
-# Kubernetes control plane is running at https://127.0.0.1:6443
-# CoreDNS is running at .../api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
-
-# Verify API server health
-curl -k https://localhost:6443/healthz
-# Expected: ok
-```
-
-[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
-
----
-
 ## Configure kubectl Access
 
 By default, the kubeconfig requires root. Configure user access:
@@ -275,6 +240,41 @@ scp user@server:/etc/rancher/k3s/k3s.yaml ~/.kube/k3s-config
 sed -i 's/127.0.0.1/<SERVER_PUBLIC_IP>/' ~/.kube/k3s-config
 export KUBECONFIG=~/.kube/k3s-config
 kubectl get nodes
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Verify the Installation
+
+```bash
+# Check service status
+systemctl status k3s
+
+# Check k3s version
+k3s --version
+kubectl version
+
+# Check node is Ready
+kubectl get nodes
+# Expected:
+# NAME         STATUS   ROLES                  AGE   VERSION
+# my-server    Ready    control-plane,master   1m    YOUR_K3S_VERSION
+
+# Check all system pods are Running
+kubectl get pods -n kube-system
+# Expected: coredns, traefik, local-path-provisioner, metrics-server all Running
+
+# Check cluster info
+kubectl cluster-info
+# Expected:
+# Kubernetes control plane is running at https://127.0.0.1:6443
+# CoreDNS is running at .../api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+# Verify API server health
+curl -k https://localhost:6443/healthz
+# Expected: ok
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)

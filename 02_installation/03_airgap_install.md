@@ -206,15 +206,17 @@ flowchart TD
 
 ## Step 5: Verify Installation
 
+Use `sudo` only for system-level operations. Run `kubectl` as your regular user after configuring kubeconfig (see Lesson 01, Configure kubectl Access).
+
 ```bash
 # Check service started
-sudo systemctl status k3s
+systemctl status k3s
 
 # Wait for node to be Ready (images load takes 30-60s)
-sudo kubectl get nodes -w
+kubectl get nodes -w
 
 # Verify all system pods are Running
-sudo kubectl get pods -n kube-system
+kubectl get pods -n kube-system
 
 # Confirm no external image pulls happened (all from local cache)
 sudo k3s crictl images | grep -v "k8s.gcr.io\|registry.k8s.io"
@@ -312,7 +314,7 @@ sudo chmod +x /usr/local/bin/k3s
 sudo systemctl start k3s
 
 # 5. Verify
-sudo kubectl get nodes
+kubectl get nodes
 k3s --version
 ```
 
