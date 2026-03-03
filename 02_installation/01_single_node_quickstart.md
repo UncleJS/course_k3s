@@ -317,7 +317,7 @@ kubectl delete svc nginx
 
 ## Uninstalling k3s
 
-k3s ships with uninstall scripts:
+k3s ships with uninstall scripts for quick removal:
 
 ```bash
 # Uninstall server node
@@ -327,15 +327,9 @@ sudo /usr/local/bin/k3s-uninstall.sh
 sudo /usr/local/bin/k3s-agent-uninstall.sh
 ```
 
-> **Warning:** These scripts remove ALL k3s data, including the datastore, certificates, and all downloaded images. They are irreversible.
+For full uninstall guidance (pre-flight backups, multi-node tear-down order, manual cleanup fallback, and post-uninstall audit), see [Uninstall & Cleanup](04_uninstall_and_cleanup.md).
 
-What the uninstall script does:
-1. Stops and disables the `k3s` systemd service
-2. Removes the `k3s` binary and symlinks
-3. Removes `/etc/rancher/k3s/` (configs)
-4. Removes `/var/lib/rancher/k3s/` (data, etcd/SQLite, images)
-5. Removes iptables rules added by k3s
-6. Removes CNI interfaces (flannel.1, cni0)
+> **Warning:** Uninstall removes local k3s state, certs, and images from the host.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

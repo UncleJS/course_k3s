@@ -16,7 +16,7 @@
 |---|--------|-------|---------|
 | 00 | [Prerequisites — Linux & Containers Primer](#module-00--prerequisites) | 🟢 Beginner | 1 |
 | 01 | [Introduction to k3s](#module-01--introduction-to-k3s) | 🟢 Beginner | 3 |
-| 02 | [Installation](#module-02--installation) | 🟢 Beginner | 3 |
+| 02 | [Installation](#module-02--installation) | 🟢 Beginner | 4 |
 | 03 | [First Steps with kubectl](#module-03--first-steps-with-kubectl) | 🟢 Beginner | 3 |
 | 04 | [Networking](#module-04--networking) | 🟡 Intermediate | 3 |
 | 05 | [Storage](#module-05--storage) | 🟡 Intermediate | 3 |
@@ -129,7 +129,8 @@ flowchart TD
 | 01 | [Single-Node Quickstart](02_installation/01_single_node_quickstart.md) |
 | 02 | [Installation Options & Flags](02_installation/02_installation_options_flags.md) |
 | 03 | [Air-Gap Install](02_installation/03_airgap_install.md) |
-| Labs | [install.sh](02_installation/labs/install.sh) · [verify.sh](02_installation/labs/verify.sh) |
+| 04 | [Uninstall & Cleanup](02_installation/04_uninstall_and_cleanup.md) |
+| Labs | [install.sh](02_installation/labs/install.sh) · [verify.sh](02_installation/labs/verify.sh) · [uninstall.sh](02_installation/labs/uninstall.sh) |
 
 ---
 
