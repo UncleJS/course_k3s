@@ -99,6 +99,9 @@ A simple, lightweight CNI plugin bundled with k3s by default. Flannel creates an
 **Flux**
 A set of GitOps controllers for Kubernetes (part of the CNCF). Flux watches Git repositories and automatically applies changes to the cluster. Includes `source-controller`, `helm-controller`, `kustomize-controller`, and `notification-controller`. See [Module 11 – GitOps](11_gitops/).
 
+**Fleet**
+A GitOps engine from Rancher designed for multi-cluster continuous delivery. Fleet watches Git repositories and deploys content as bundles across one or many clusters, with rich targeting and drift reconciliation. See [Module 18 – Rancher](18_rancher/).
+
 ---
 
 ## G
@@ -244,6 +247,9 @@ An open-source time-series metrics database and monitoring system. The standard 
 ---
 
 ## R
+
+**Rancher**
+A multi-cluster Kubernetes management platform (Rancher Manager) providing a central UI and API for cluster inventory, RBAC, authentication integration, and GitOps at scale (via Fleet). Commonly run on a dedicated management cluster that manages downstream clusters. See [Module 18 – Rancher](18_rancher/).
 
 **RBAC (Role-Based Access Control)**
 A Kubernetes authorisation mechanism that controls which users and service accounts can perform which operations on which resources. Defined with `Role`, `ClusterRole`, `RoleBinding`, and `ClusterRoleBinding` objects. See [Module 09 – Security](09_security/).

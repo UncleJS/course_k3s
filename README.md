@@ -32,6 +32,7 @@
 | 15 | [Troubleshooting](#module-15--troubleshooting) | 🟡–🔴 All Levels | 5 |
 | 16 | [Moving from Podman to k3s](#module-16--moving-from-podman-to-k3s) | 🟢–🟡 Beginner/Intermediate | 4 |
 | 17 | [Moving from Docker to k3s](#module-17--moving-from-docker-to-k3s) | 🟢–🟡 Beginner/Intermediate | 5 |
+| 18 | [Rancher (Multi-Cluster Management)](#module-18--rancher-multi-cluster-management) | 🔴 Advanced | 4 |
 
 ### 📋 Cheatsheets
 
@@ -76,6 +77,8 @@ flowchart TD
     L --> O[12 CI/CD]
     M --> O
     N --> O
+    K --> V[18 Rancher]
+    V --> O
     O --> P[13 Backup & DR]
     P --> Q[14 Maintenance]
     Q --> R[15 Troubleshooting]
@@ -90,6 +93,7 @@ flowchart TD
     style K fill:#f59e0b,color:#fff
     style T fill:#0ea5e9,color:#fff
     style U fill:#0ea5e9,color:#fff
+    style V fill:#14b8a6,color:#fff
 ```
 
 ---
@@ -330,6 +334,20 @@ flowchart TD
 | 04 | [Docker Gotchas When Moving to k3s](17_docker_to_k3s/04_docker_gotchas.md) |
 | 05 | [Full Migration Walkthrough](17_docker_to_k3s/05_migration_walkthrough.md) |
 | Labs | [docker-compose-example.yml](17_docker_to_k3s/labs/docker-compose-example.yml) · [docker-compose-to-k3s.yaml](17_docker_to_k3s/labs/docker-compose-to-k3s.yaml) |
+
+---
+
+## Module 18 — Rancher (Multi-Cluster Management)
+
+> 🔴 Advanced · Centralised multi-cluster management and Fleet GitOps
+
+| Lesson | File |
+|--------|------|
+| 01 | [Rancher Overview](18_rancher/01_rancher_overview.md) |
+| 02 | [Install Rancher on k3s (Helm)](18_rancher/02_install_rancher_on_k3s.md) |
+| 03 | [Import Existing Clusters](18_rancher/03_import_existing_clusters.md) |
+| 04 | [Fleet Basics](18_rancher/04_fleet_basics.md) |
+| Labs | [rancher-values.yaml](18_rancher/labs/rancher-values.yaml) · [fleet-gitrepo.yaml](18_rancher/labs/fleet-gitrepo.yaml) |
 
 ---
 

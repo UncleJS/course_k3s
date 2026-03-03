@@ -1,0 +1,25 @@
+hostname: rancher.192.168.1.10.sslip.io
+
+# Only used for first login; change it after you log in.
+bootstrapPassword: "change-me"
+
+# Rancher server replicas. Default in many examples is 3; 1 is fine for a small lab cluster.
+replicas: 1
+
+# TLS source for the Rancher ingress. Options: rancher, letsEncrypt, secret
+ingress:
+  tls:
+    source: rancher
+
+# If you use a private CA for TLS, set this to true and ensure downstream nodes trust the CA.
+# privateCA: true
+
+# Let's Encrypt example (requires public DNS + HTTP-01 reachability):
+# ingress:
+#   tls:
+#     source: letsEncrypt
+# letsEncrypt:
+#   email: you@example.com
+#   environment: production
+#   ingress:
+#     class: traefik
