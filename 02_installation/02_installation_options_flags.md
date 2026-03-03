@@ -49,7 +49,7 @@ Pass env vars to the installer script to control install behavior:
 ```bash
 # Install with environment variables
 curl -sfL https://get.k3s.io | \
-  INSTALL_K3S_VERSION="v1.29.3+k3s1" \
+  INSTALL_K3S_VERSION="YOUR_K3S_VERSION" \
   INSTALL_K3S_EXEC="server --disable traefik" \
   K3S_TOKEN="mysecrettoken" \
   K3S_KUBECONFIG_MODE="644" \
@@ -58,7 +58,7 @@ curl -sfL https://get.k3s.io | \
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `INSTALL_K3S_VERSION` | Specific k3s version to install | `v1.29.3+k3s1` |
+| `INSTALL_K3S_VERSION` | Specific k3s version to install | `v1.35.1+k3s1` |
 | `INSTALL_K3S_CHANNEL` | Release channel: stable, latest, testing | `stable` |
 | `INSTALL_K3S_EXEC` | Extra args for the k3s command | `server --disable traefik` |
 | `INSTALL_K3S_SKIP_START` | Install but don't start the service | `true` |

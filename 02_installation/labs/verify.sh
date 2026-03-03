@@ -8,6 +8,12 @@ set -uo pipefail
 PASS=0
 FAIL=0
 WARN=0
+KUBECONFIG_PATH="${KUBECONFIG_PATH:-/etc/rancher/k3s/k3s.yaml}"
+KUBECTL="kubectl"
+
+if [[ -f "$KUBECONFIG_PATH" ]]; then
+  KUBECTL="kubectl --kubeconfig $KUBECONFIG_PATH"
+fi
 
 green() { echo -e "\033[0;32m✔ $*\033[0m"; }
 red()   { echo -e "\033[0;31m✘ $*\033[0m"; }
@@ -56,31 +62,31 @@ check "k3s service is enabled" "systemctl is-enabled k3s"
 echo ""
 echo "--- API Server Checks ---"
 check "API server responds (local)" "curl -sk https://localhost:6443/healthz | grep -q ok"
-check "Kubeconfig exists" "test -f /etc/rancher/k3s/k3s.yaml"
-check "kubectl can reach API" "kubectl cluster-info"
+check "Kubeconfig exists" "test -f $KUBECONFIG_PATH"
+check "kubectl can reach API" "$KUBECTL cluster-info"
 
 echo ""
 echo "--- Node Checks ---"
-check "Node is Ready" "kubectl get nodes | grep -q Ready"
-NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
+check "Node is Ready" "$KUBECTL get nodes | grep -q Ready"
+NODES=$($KUBECTL get nodes --no-headers 2>/dev/null | wc -l)
 green "Total nodes: $NODES"
 
 echo ""
 echo "--- Core Component Checks ---"
-check "CoreDNS is Running" "kubectl get pods -n kube-system -l k8s-app=kube-dns | grep -q Running"
-warn_check "Traefik is Running" "kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik | grep -q Running"
-check "local-path-provisioner is Running" "kubectl get pods -n kube-system -l app=local-path-provisioner | grep -q Running"
-warn_check "metrics-server is Running" "kubectl get pods -n kube-system -l k8s-app=metrics-server | grep -q Running"
+check "CoreDNS is Running" "$KUBECTL get pods -n kube-system -l k8s-app=kube-dns | grep -q Running"
+warn_check "Traefik is Running" "$KUBECTL get pods -n kube-system -l app.kubernetes.io/name=traefik | grep -q Running"
+check "local-path-provisioner is Running" "$KUBECTL get pods -n kube-system -l app=local-path-provisioner | grep -q Running"
+warn_check "metrics-server is Running" "$KUBECTL get pods -n kube-system -l k8s-app=metrics-server | grep -q Running"
 
 echo ""
 echo "--- Storage Checks ---"
-check "local-path StorageClass exists" "kubectl get storageclass local-path"
-check "local-path is default StorageClass" "kubectl get storageclass local-path -o jsonpath='{.metadata.annotations}' | grep -q 'is-default-class.*true'"
+check "local-path StorageClass exists" "$KUBECTL get storageclass local-path"
+check "local-path is default StorageClass" "$KUBECTL get storageclass local-path -o jsonpath='{.metadata.annotations}' | grep -q 'is-default-class.*true'"
 
 echo ""
 echo "--- Networking Checks ---"
 check "flannel.1 interface exists" "ip link show flannel.1"
-check "cni0 bridge exists" "ip link show cni0 2>/dev/null || ip link show flannel.1"
+warn_check "cni0 bridge exists" "ip link show cni0"
 
 echo ""
 echo "--- Token & Certs ---"

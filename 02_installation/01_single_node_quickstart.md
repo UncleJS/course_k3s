@@ -21,6 +21,8 @@
 
 Before installing, verify your system meets the minimum requirements:
 
+> **Important:** This lesson installs a **single-node server** cluster. That one machine runs the control plane, datastore, and workloads, so use **server** sizing guidance (2 CPU / 2 GB RAM minimum). The 512 MB minimum applies to **agent-only** nodes.
+
 ```bash
 # Check OS
 cat /etc/os-release
@@ -28,7 +30,10 @@ cat /etc/os-release
 # Check kernel version (4.15+ required, 5.x+ recommended)
 uname -r
 
-# Check available RAM (512 MB minimum)
+# Check CPU cores (2 cores minimum for a server node)
+nproc
+
+# Check available RAM (2 GB minimum for a server node)
 free -h
 
 # Check available disk (5 GB minimum)
@@ -37,9 +42,10 @@ df -h /
 # Check cgroup support
 stat -fc %T /sys/fs/cgroup/
 
-# Disable swap (required by kubelet)
+# Swap guidance: recommended to disable for predictable behavior.
+# Older k3s/kubelet versions require swap off.
 sudo swapoff -a
-# Make permanent:
+# Optional: make it permanent if this host is dedicated to k3s.
 sudo sed -i '/ swap / s/^\(.*\)$/#\1/' /etc/fstab
 ```
 
@@ -93,7 +99,8 @@ The official installer script downloads the binary, creates the systemd service,
 curl -sfL https://get.k3s.io | sh -
 
 # Install specific version
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.29.3+k3s1" sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="YOUR_K3S_VERSION" sh -
+# Example: INSTALL_K3S_VERSION="v1.35.1+k3s1"
 
 # Install with custom options
 curl -sfL https://get.k3s.io | sh -s - \
@@ -128,7 +135,7 @@ sudo journalctl -u k3s -f
 
 Expected output:
 ```
-k3s[1234]: time="..." level=info msg="Starting k3s v1.29.3+k3s1"
+k3s[1234]: time="..." level=info msg="Starting k3s YOUR_K3S_VERSION"
 k3s[1234]: time="..." level=info msg="Starting containerd"
 k3s[1234]: time="..." level=info msg="containerd is now running"
 k3s[1234]: time="..." level=info msg="Running kube-apiserver"
@@ -146,7 +153,7 @@ Use this when you need full control over the install or are doing an air-gap set
 
 ```bash
 # 1. Download the binary
-K3S_VERSION="v1.29.3+k3s1"
+K3S_VERSION="YOUR_K3S_VERSION"
 curl -LO "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s"
 
 # 2. Make it executable and move to PATH
@@ -209,7 +216,7 @@ sudo kubectl version
 sudo kubectl get nodes
 # Expected:
 # NAME         STATUS   ROLES                  AGE   VERSION
-# my-server    Ready    control-plane,master   1m    v1.29.3+k3s1
+# my-server    Ready    control-plane,master   1m    YOUR_K3S_VERSION
 
 # Check all system pods are Running
 sudo kubectl get pods -n kube-system
@@ -338,7 +345,7 @@ What the uninstall script does:
 
 | Pitfall | Symptom | Fix |
 |---------|---------|-----|
-| Swap not disabled | `kubelet` refuses to start, service fails | `sudo swapoff -a` + remove from `/etc/fstab` |
+| Swap configuration mismatch | `kubelet` startup errors on older versions | Disable swap with `sudo swapoff -a` or configure kubelet swap behavior for your k3s version |
 | Firewall blocking 6443 | `kubectl` connection refused | Open TCP 6443: `sudo ufw allow 6443/tcp` |
 | SELinux enforcing | Pods crash, permission denied in logs | `sudo setenforce 0` or install k3s SELinux policy |
 | cgroup v1 without memory accounting | Pods OOMKilled | Add `cgroup_enable=memory swapaccount=1` to grub cmdline |

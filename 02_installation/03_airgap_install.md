@@ -30,6 +30,8 @@ An **air-gapped** environment has no internet access. This includes:
 
 k3s supports air-gap installs by allowing you to pre-download all artifacts and load them before running the installer.
 
+> **Sizing note:** If you are following this lesson as a single-node setup, this host is a **server node**. Plan for server minimums (2 CPU / 2 GB RAM). The 512 MB minimum is for agent-only nodes.
+
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
@@ -70,7 +72,7 @@ flowchart TD
 #!/usr/bin/env bash
 # download-airgap.sh — run on a machine WITH internet access
 
-K3S_VERSION="v1.29.3+k3s1"
+K3S_VERSION="YOUR_K3S_VERSION"   # Example: v1.35.1+k3s1
 ARCH="amd64"   # or arm64 for ARM servers, arm for ARMv7
 
 OUTPUT_DIR="./k3s-airgap-${K3S_VERSION}"
@@ -123,14 +125,14 @@ echo "Done! Transfer the '${OUTPUT_DIR}' directory to your air-gapped host."
 
 ```bash
 # Via SCP (if the host is reachable by SSH from a jump host)
-scp -r k3s-airgap-v1.29.3+k3s1/ user@airgap-host:/tmp/
+scp -r k3s-airgap-YOUR_K3S_VERSION/ user@airgap-host:/tmp/
 
 # Via USB drive (physical transfer)
 # Copy files to USB, then on the air-gapped host:
 cp /media/usb/k3s-airgap-* /tmp/
 
 # Verify checksums on the air-gapped host
-cd /tmp/k3s-airgap-v1.29.3+k3s1/
+cd /tmp/k3s-airgap-YOUR_K3S_VERSION/
 sha256sum -c SHA256SUMS
 ```
 
@@ -147,7 +149,7 @@ k3s's containerd reads images from a special directory at startup. Place the ima
 sudo mkdir -p /var/lib/rancher/k3s/agent/images/
 
 # Copy the images tarball
-sudo cp /tmp/k3s-airgap-v1.29.3+k3s1/k3s-airgap-images-amd64.tar.zst \
+sudo cp /tmp/k3s-airgap-YOUR_K3S_VERSION/k3s-airgap-images-amd64.tar.zst \
   /var/lib/rancher/k3s/agent/images/
 
 # Set correct permissions
@@ -163,7 +165,7 @@ sudo chmod 755 /var/lib/rancher/k3s/agent/images/
 ## Step 4: Run the Installer
 
 ```bash
-cd /tmp/k3s-airgap-v1.29.3+k3s1/
+cd /tmp/k3s-airgap-YOUR_K3S_VERSION/
 
 # Make binary executable and place it
 chmod +x k3s
@@ -171,12 +173,12 @@ sudo cp k3s /usr/local/bin/k3s
 
 # Run the installer with SKIP_DOWNLOAD — uses the binary we placed manually
 sudo INSTALL_K3S_SKIP_DOWNLOAD=true \
-     INSTALL_K3S_VERSION="v1.29.3+k3s1" \
+     INSTALL_K3S_VERSION="YOUR_K3S_VERSION" \
      ./install.sh
 
 # Or with custom options
 sudo INSTALL_K3S_SKIP_DOWNLOAD=true \
-     INSTALL_K3S_VERSION="v1.29.3+k3s1" \
+     INSTALL_K3S_VERSION="YOUR_K3S_VERSION" \
      ./install.sh server \
      --write-kubeconfig-mode 644 \
      --tls-san 192.168.1.10
@@ -292,7 +294,7 @@ flowchart TD
 ```bash
 # On air-gapped host — update k3s binary and images
 
-NEW_VERSION="v1.29.5+k3s1"
+NEW_VERSION="YOUR_NEW_VERSION"
 
 # 1. Place new images tarball (remove old one first)
 sudo rm /var/lib/rancher/k3s/agent/images/k3s-airgap-images-amd64.tar.zst
