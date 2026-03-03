@@ -37,10 +37,10 @@ This lesson covers the full image lifecycle from a Docker background: how BuildK
 
 ```mermaid
 flowchart LR
-    A[Dockerfile] -->|docker build\ndocker buildx| B[Docker local store\n/var/lib/docker]
-    B -->|docker push\ncosign sign| C[Remote Registry\nHub / GHCR / ECR / GCR]
-    C -->|imagePullPolicy| D[k3s containerd store\n/var/lib/rancher/k3s]
-    B -->|docker save\nctr import| D
+    A[Dockerfile] -->|docker build docker buildx| B[Docker local store /var/lib/docker]
+    B -->|docker push cosign sign| C[Remote Registry Hub / GHCR / ECR / GCR]
+    C -->|imagePullPolicy| D[k3s containerd store /var/lib/rancher/k3s]
+    B -->|docker save ctr import| D
     E[trivy scan] -.->|gate on CRITICAL| C
     style B fill:#2d3748,color:#e2e8f0
     style D fill:#2d3748,color:#e2e8f0
@@ -64,11 +64,11 @@ k3s uses **containerd** (not Docker daemon) as its CRI. When a Pod is scheduled,
 
 ```mermaid
 flowchart TD
-    A[Pod scheduled] --> B{Image in\ncontainerd store?}
+    A[Pod scheduled] --> B{Image in containerd store?}
     B -->|Yes + IfNotPresent| C[Use cached image]
     B -->|No| D[Pull from registry]
     B -->|Always policy| D
-    D --> E{Pull secret\npresent?}
+    D --> E{Pull secret present?}
     E -->|Yes| F[Authenticate + pull]
     E -->|No| G{Public registry?}
     G -->|Yes| F
@@ -141,8 +141,8 @@ docker buildx imagetools inspect ghcr.io/myorg/taskr-web:1.2.3
 
 ```mermaid
 flowchart LR
-    A[docker buildx build\n--platform amd64,arm64] --> B[BuildKit cross-compile]
-    B --> C[ghcr.io/myorg/taskr-web:1.2.3\nmanifest list]
+    A[docker buildx build --platform amd64,arm64] --> B[BuildKit cross-compile]
+    B --> C[ghcr.io/myorg/taskr-web:1.2.3 manifest list]
     C --> D[amd64 layer]
     C --> E[arm64 layer]
     D -->|k3s on amd64 node| F[containerd pulls amd64]
@@ -214,10 +214,10 @@ Docker Hub's free tier enforces pull rate limits. In k3s, every Pod restart may 
 ```mermaid
 flowchart LR
     A[CI/CD pipeline] -->|docker push| B{Registry choice}
-    B -->|open-source| C[GHCR\nghcr.io]
-    B -->|AWS infra| D[ECR\n*.dkr.ecr.*.amazonaws.com]
-    B -->|self-hosted| E[Harbor\nharbor.internal]
-    B -->|simple/public| F[Docker Hub\ndocker.io]
+    B -->|open-source| C[GHCR ghcr.io]
+    B -->|AWS infra| D[ECR *.dkr.ecr.*.amazonaws.com]
+    B -->|self-hosted| E[Harbor harbor.internal]
+    B -->|simple/public| F[Docker Hub docker.io]
     C --> G[k3s pulls]
     D --> G
     E --> G
@@ -356,11 +356,11 @@ Layer caching is critical for fast CI pipelines. Docker BuildKit supports severa
 ```mermaid
 flowchart TD
     A[docker buildx build] --> B{Cache backend}
-    B -->|GitHub Actions| C[type=gha\nGitHub cache API]
-    B -->|Registry| D[type=registry\ncache image in registry]
-    B -->|Local dir| E[type=local\n/tmp/buildkit-cache]
+    B -->|GitHub Actions| C[type=gha GitHub cache API]
+    B -->|Registry| D[type=registry cache image in registry]
+    B -->|Local dir| E[type=local /tmp/buildkit-cache]
     B -->|S3/GCS| F[type=s3 or gcs]
-    C --> G[Fast CI rebuild\nonly changed layers]
+    C --> G[Fast CI rebuild only changed layers]
     D --> G
     E --> G
     F --> G
@@ -534,7 +534,7 @@ sudo crictl images | grep taskr-web
 flowchart LR
     A[Docker local store] -->|docker save| B[taskr-web.tar]
     B -->|scp / rsync| C[k3s node]
-    C -->|ctr -n k8s.io\nimages import| D[containerd k8s.io\nnamespace]
+    C -->|ctr -n k8s.io images import| D[containerd k8s.io namespace]
     D -->|imagePullPolicy: Never| E[Pod uses imported image]
     style D fill:#14532d,color:#86efac
     style E fill:#14532d,color:#86efac

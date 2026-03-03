@@ -30,9 +30,9 @@ A **Container Network Interface (CNI)** plugin is responsible for:
 ```mermaid
 flowchart TD
     KL[kubelet creates a Pod] --> CNI[Calls CNI plugin]
-    CNI --> VETH[Creates veth pair\nconnects pod to node bridge]
-    CNI --> IPAM[Assigns IP from Pod CIDR\n10.42.x.x/24 for this node]
-    CNI --> ROUTE[Sets up routing rules\nso other nodes can reach this pod]
+    CNI --> VETH[Creates veth pair connects pod to node bridge]
+    CNI --> IPAM[Assigns IP from Pod CIDR 10.42.x.x/24 for this node]
+    CNI --> ROUTE[Sets up routing rules so other nodes can reach this pod]
     ROUTE --> DONE[Pod has IP and can communicate]
 
     style DONE fill:#22c55e,color:#fff
@@ -78,12 +78,12 @@ sudo kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec
 graph TB
     subgraph "Node 1 (192.168.1.10)"
         subgraph "Pod Network: 10.42.0.0/24"
-            P1[Pod A\n10.42.0.5]
-            P2[Pod B\n10.42.0.6]
+            P1[Pod A 10.42.0.5]
+            P2[Pod B 10.42.0.6]
         end
-        BR1[cni0 bridge\n10.42.0.1/24]
-        VX1[flannel.1\nVXLAN endpoint]
-        ETH1[eth0\n192.168.1.10]
+        BR1[cni0 bridge 10.42.0.1/24]
+        VX1[flannel.1 VXLAN endpoint]
+        ETH1[eth0 192.168.1.10]
         P1 <-->|veth| BR1
         P2 <-->|veth| BR1
         BR1 <--> VX1
@@ -92,11 +92,11 @@ graph TB
 
     subgraph "Node 2 (192.168.1.11)"
         subgraph "Pod Network: 10.42.1.0/24"
-            P3[Pod C\n10.42.1.5]
+            P3[Pod C 10.42.1.5]
         end
-        BR2[cni0 bridge\n10.42.1.1/24]
-        VX2[flannel.1\nVXLAN endpoint]
-        ETH2[eth0\n192.168.1.11]
+        BR2[cni0 bridge 10.42.1.1/24]
+        VX2[flannel.1 VXLAN endpoint]
+        ETH2[eth0 192.168.1.11]
         P3 <-->|veth| BR2
         BR2 <--> VX2
         VX2 <--> ETH2
@@ -132,7 +132,7 @@ sequenceDiagram
     participant PC as Pod C (10.42.1.5)
 
     PA->>N1: IP packet to 10.42.1.5
-    N1->>N1: Encapsulate in UDP/VXLAN\n(dest: 192.168.1.11:8472)
+    N1->>N1: Encapsulate in UDP/VXLAN (dest: 192.168.1.11:8472)
     N1->>N2: Physical network hop
     N2->>N2: Decapsulate VXLAN packet
     N2->>PC: Original IP packet delivered

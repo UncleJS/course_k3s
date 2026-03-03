@@ -133,14 +133,14 @@ spec:
 ```mermaid
 flowchart TD
     subgraph "k3s default"
-        FL[Flannel\nVXLAN overlay]
-        FL -->|network policies| IGNORED[⚠ Silently ignored\nall traffic still allowed]
+        FL[Flannel VXLAN overlay]
+        FL -->|network policies| IGNORED[⚠ Silently ignored all traffic still allowed]
     end
 
     subgraph "NetworkPolicy-capable CNIs"
-        CA[Canal\nFlannel + Calico policy engine]
-        CALC[Calico\neBPF or iptables]
-        CIL[Cilium\neBPF-native]
+        CA[Canal Flannel + Calico policy engine]
+        CALC[Calico eBPF or iptables]
+        CIL[Cilium eBPF-native]
         CA --> ENFORCED1[✓ Policies enforced]
         CALC --> ENFORCED2[✓ Policies enforced]
         CIL --> ENFORCED3[✓ Policies enforced]
@@ -200,10 +200,10 @@ The recommended starting point for any namespace is a **deny-all** policy. Then 
 
 ```mermaid
 flowchart TD
-    START([New Namespace]) --> DENY[Apply deny-all\ningress + egress]
-    DENY --> ADD_DNS[Add allow-dns\negress to kube-dns :53]
-    ADD_DNS --> ADD_APP[Add allow rules\nfor your application traffic]
-    ADD_APP --> DONE([Minimal, explicit\npermission surface])
+    START([New Namespace]) --> DENY[Apply deny-all ingress + egress]
+    DENY --> ADD_DNS[Add allow-dns egress to kube-dns :53]
+    ADD_DNS --> ADD_APP[Add allow rules for your application traffic]
+    ADD_APP --> DONE([Minimal, explicit permission surface])
 ```
 
 ```yaml
@@ -420,11 +420,11 @@ podSelector: {}
 ```mermaid
 flowchart LR
     subgraph "namespace: my-app"
-        FE[frontend\napp: frontend] -->|TCP :8080\nallowed| BE[backend\napp: backend]
-        FE -->|TCP :5432\nblocked| DB[(database\napp: database)]
-        BE -->|TCP :5432\nallowed| DB
-        EXT([internet]) -->|any\nblocked| BE
-        EXT -->|any\nblocked| DB
+        FE[frontend app: frontend] -->|TCP :8080 allowed| BE[backend app: backend]
+        FE -->|TCP :5432 blocked| DB[(database app: database)]
+        BE -->|TCP :5432 allowed| DB
+        EXT([internet]) -->|any blocked| BE
+        EXT -->|any blocked| DB
     end
 ```
 

@@ -27,7 +27,7 @@ The **local-path-provisioner** is a storage provisioner bundled with k3s that au
 flowchart TD
     APP[Application Pod] -->|"requests storage"| PVC[PersistentVolumeClaim]
     PVC -->|"StorageClass: local-path"| PROV[local-path-provisioner Pod]
-    PROV -->|"creates directory"| DIR["/opt/local-path-provisioner/<uuid>\non node filesystem"]
+    PROV -->|"creates directory"| DIR["/opt/local-path-provisioner/<uuid> on node filesystem"]
     PROV -->|"creates"| PV[PersistentVolume]
     PV -->|"bound"| PVC
     PVC -->|"mounted"| APP

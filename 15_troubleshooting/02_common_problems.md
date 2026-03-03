@@ -19,18 +19,18 @@
 
 ```mermaid
 flowchart TD
-    Start([Pod not healthy]) --> GetStatus[kubectl get pod\nkubectl describe pod]
+    Start([Pod not healthy]) --> GetStatus[kubectl get pod kubectl describe pod]
 
     GetStatus --> S1{Pod Phase?}
 
     S1 -->|Pending| P1{Events show reason?}
-    P1 -->|Insufficient CPU/Memory| Fix_Resources[Increase node capacity\nor reduce requests]
-    P1 -->|No nodes match selector/taint| Fix_Sched[Fix nodeSelector/\ntolerations]
+    P1 -->|Insufficient CPU/Memory| Fix_Resources[Increase node capacity or reduce requests]
+    P1 -->|No nodes match selector/taint| Fix_Sched[Fix nodeSelector/ tolerations]
     P1 -->|PVC not bound| Fix_PVC[Check PVC & StorageClass]
     P1 -->|ImagePullBackOff in init| Fix_Image[See §ImagePullBackOff]
 
     S1 -->|Running, but not Ready| P2{Readiness probe failing?}
-    P2 -->|Yes| Fix_Probe[Fix probe path/port\nor app health endpoint]
+    P2 -->|Yes| Fix_Probe[Fix probe path/port or app health endpoint]
     P2 -->|No| Check_Logs[kubectl logs — check app errors]
 
     S1 -->|CrashLoopBackOff| CL[See §CrashLoopBackOff]
@@ -39,7 +39,7 @@ flowchart TD
 
     S1 -->|ImagePullBackOff| IMG[See §ImagePullBackOff]
 
-    S1 -->|Terminating stuck| Term[kubectl delete pod\n--grace-period=0 --force]
+    S1 -->|Terminating stuck| Term[kubectl delete pod --grace-period=0 --force]
 
     style Fix_Resources fill:#fff3cd,stroke:#ffc107
     style Fix_Sched fill:#fff3cd,stroke:#ffc107

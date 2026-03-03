@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verify.sh — k3s post-install verification lab script
 # Module 02 · Lab | Course: Mastering k3s
-# Licensed under CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+# Licensed under CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 set -uo pipefail
 
@@ -84,7 +84,8 @@ check "cni0 bridge exists" "ip link show cni0 2>/dev/null || ip link show flanne
 
 echo ""
 echo "--- Token & Certs ---"
-check "Server token file exists" "test -f /var/lib/rancher/k3s/server/token"
+check "Node join token file exists" "test -f /var/lib/rancher/k3s/server/node-token"
+warn_check "Server join token file exists" "test -f /var/lib/rancher/k3s/server/token"
 check "TLS certs directory exists" "test -d /var/lib/rancher/k3s/server/tls"
 
 echo ""

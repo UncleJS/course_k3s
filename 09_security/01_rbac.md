@@ -41,13 +41,13 @@ flowchart LR
     end
 
     subgraph Bindings
-        RB[RoleBinding\nnamespaced]
-        CRB[ClusterRoleBinding\ncluster-wide]
+        RB[RoleBinding namespaced]
+        CRB[ClusterRoleBinding cluster-wide]
     end
 
     subgraph Permissions
-        R[Role\nnamespaced]
-        CR[ClusterRole\ncluster-wide]
+        R[Role namespaced]
+        CR[ClusterRole cluster-wide]
     end
 
     U  --> RB
@@ -59,7 +59,7 @@ flowchart LR
     RB  --> CR
     CRB --> CR
 
-    R  -->|rules| API[API Server\nAuthorization]
+    R  -->|rules| API[API Server Authorization]
     CR -->|rules| API
 ```
 
@@ -115,15 +115,15 @@ Common verbs:
 ```mermaid
 graph TD
     subgraph "Namespace: production"
-        R[Role\ndeploy-manager\ncan manage Deployments\nin 'production' only]
+        R[Role deploy-manager can manage Deployments in 'production' only]
     end
 
     subgraph "Cluster-wide"
-        CR1[ClusterRole\nnode-reader\ncan read Nodes\ncluster-wide]
-        CR2[ClusterRole\ncluster-admin\nfull access\neverything]
+        CR1[ClusterRole node-reader can read Nodes cluster-wide]
+        CR2[ClusterRole cluster-admin full access everything]
     end
 
-    note1["A ClusterRole can also be bound\nwith a RoleBinding — restricting\nits effect to that namespace"]
+    note1["A ClusterRole can also be bound with a RoleBinding — restricting its effect to that namespace"]
 ```
 
 **Use a Role when:** the permission is meaningful only within a namespace (e.g., manage Deployments in `staging`).
@@ -162,18 +162,18 @@ kubectl describe clusterrole edit
 ```mermaid
 flowchart TD
     subgraph "Option A — namespace-scoped"
-        SA1[ServiceAccount\nci-bot] -->|RoleBinding\nin 'production'| R1[Role\ndeploy-manager\nin 'production']
-        R1 --> EFF1[Effect: ci-bot can manage\nDeployments in production ONLY]
+        SA1[ServiceAccount ci-bot] -->|RoleBinding in 'production'| R1[Role deploy-manager in 'production']
+        R1 --> EFF1[Effect: ci-bot can manage Deployments in production ONLY]
     end
 
     subgraph "Option B — cluster-scoped with ClusterRole"
-        SA2[ServiceAccount\nci-bot] -->|ClusterRoleBinding| CR1[ClusterRole\ndeploy-manager]
-        CR1 --> EFF2[Effect: ci-bot can manage\nDeployments in ALL namespaces]
+        SA2[ServiceAccount ci-bot] -->|ClusterRoleBinding| CR1[ClusterRole deploy-manager]
+        CR1 --> EFF2[Effect: ci-bot can manage Deployments in ALL namespaces]
     end
 
     subgraph "Option C — reuse ClusterRole namespace-scoped"
-        SA3[ServiceAccount\nci-bot] -->|RoleBinding\nin 'production'| CR2[ClusterRole\ndeploy-manager]
-        CR2 --> EFF3[Effect: ci-bot can manage\nDeployments in production ONLY\nbut role definition is reusable]
+        SA3[ServiceAccount ci-bot] -->|RoleBinding in 'production'| CR2[ClusterRole deploy-manager]
+        CR2 --> EFF3[Effect: ci-bot can manage Deployments in production ONLY but role definition is reusable]
     end
 ```
 
@@ -196,8 +196,8 @@ sequenceDiagram
     participant API as API Server
     participant RBAC
 
-    Pod->>API: Request with Bearer token\n(mounted at /var/run/secrets/kubernetes.io/serviceaccount/token)
-    API->>RBAC: Can ServiceAccount X\nperform verb V on resource R?
+    Pod->>API: Request with Bearer token (mounted at /var/run/secrets/kubernetes.io/serviceaccount/token)
+    API->>RBAC: Can ServiceAccount X perform verb V on resource R?
     RBAC-->>API: Allow / Deny
     API-->>Pod: 200 OK / 403 Forbidden
 ```
@@ -398,16 +398,16 @@ kubectl get clusterrolebindings -o json | \
 
 ```mermaid
 flowchart TD
-    START([Design an access policy]) --> Q1{Does the subject\nneed cluster-wide access?}
-    Q1 -->|No| Q2{Does it need\nwrite access?}
-    Q1 -->|Yes| Q3{To non-namespaced\nresources only?}
-    Q2 -->|No| USE_VIEW[Use built-in\nClusterRole: view\nbound with RoleBinding]
-    Q2 -->|Yes| Q4{Full namespace\ncontrol?}
-    Q4 -->|Yes| USE_ADMIN[Use built-in\nClusterRole: admin\nbound with RoleBinding]
-    Q4 -->|No| CUSTOM[Write a custom\nClusterRole with\nminimal verbs]
-    Q3 -->|Yes| CRB_NODE[ClusterRoleBinding\nto custom ClusterRole\nfor nodes/PVs only]
-    Q3 -->|No| DANGER[⚠ Review carefully —\ncluster-admin is almost\nnever appropriate]
-    CUSTOM --> BIND[RoleBinding\nin target namespace]
+    START([Design an access policy]) --> Q1{Does the subject need cluster-wide access?}
+    Q1 -->|No| Q2{Does it need write access?}
+    Q1 -->|Yes| Q3{To non-namespaced resources only?}
+    Q2 -->|No| USE_VIEW[Use built-in ClusterRole: view bound with RoleBinding]
+    Q2 -->|Yes| Q4{Full namespace control?}
+    Q4 -->|Yes| USE_ADMIN[Use built-in ClusterRole: admin bound with RoleBinding]
+    Q4 -->|No| CUSTOM[Write a custom ClusterRole with minimal verbs]
+    Q3 -->|Yes| CRB_NODE[ClusterRoleBinding to custom ClusterRole for nodes/PVs only]
+    Q3 -->|No| DANGER[⚠ Review carefully — cluster-admin is almost never appropriate]
+    CUSTOM --> BIND[RoleBinding in target namespace]
 ```
 
 **Checklist for any new RBAC policy:**

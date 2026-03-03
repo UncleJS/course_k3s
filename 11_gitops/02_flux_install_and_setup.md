@@ -27,19 +27,19 @@ Flux v2 is a set of CNCF-graduated GitOps controllers for Kubernetes. Unlike Flu
 ```mermaid
 graph TD
     subgraph GitSources["Source Layer"]
-        GR[GitRepository\ngit clone + watch]
-        HR_SRC[HelmRepository\nfetch index.yaml]
-        OCIRepo[OCIRepository\nfetch OCI artifact]
-        Bucket[Bucket\nS3 / GCS source]
+        GR[GitRepository git clone + watch]
+        HR_SRC[HelmRepository fetch index.yaml]
+        OCIRepo[OCIRepository fetch OCI artifact]
+        Bucket[Bucket S3 / GCS source]
     end
 
     subgraph Controllers["Flux Controllers"]
-        SC[source-controller\nfetches + archives sources]
-        KC[kustomize-controller\napplies Kustomizations]
-        HC[helm-controller\nmanages HelmReleases]
-        NC[notification-controller\nsends alerts + receives webhooks]
-        IC[image-reflector-controller\nscans container registries]
-        IAC[image-automation-controller\ncommits image tag updates]
+        SC[source-controller fetches + archives sources]
+        KC[kustomize-controller applies Kustomizations]
+        HC[helm-controller manages HelmReleases]
+        NC[notification-controller sends alerts + receives webhooks]
+        IC[image-reflector-controller scans container registries]
+        IAC[image-automation-controller commits image tag updates]
     end
 
     subgraph Outputs["Applied to Cluster"]
@@ -150,11 +150,15 @@ export GITHUB_USER=my-github-username
 ```bash
 flux bootstrap github \
   --owner=${GITHUB_USER} \
-  --repository=fleet-infra \           # repo name (created if it doesn't exist)
+  # repo name (created if it doesn't exist)
+  --repository=fleet-infra \
   --branch=main \
-  --path=clusters/my-cluster \         # where Flux will commit its manifests
-  --personal \                         # use personal token (vs org token)
-  --token-auth                         # use HTTPS with token (vs SSH deploy key)
+  # where Flux will commit its manifests
+  --path=clusters/my-cluster \
+  # use personal token (vs org token)
+  --personal \
+  # use HTTPS with token (vs SSH deploy key)
+  --token-auth
 ```
 
 > **SSH alternative:** Omit `--token-auth` and Flux will generate an SSH deploy key and print the public key. Add it to the repository's deploy keys in GitHub settings.
@@ -203,7 +207,8 @@ For self-hosted GitLab:
 
 ```bash
 flux bootstrap gitlab \
-  --hostname=gitlab.example.com \       # self-hosted GitLab URL
+  # self-hosted GitLab URL
+  --hostname=gitlab.example.com \
   --owner=my-group \
   --repository=fleet-infra \
   --branch=main \

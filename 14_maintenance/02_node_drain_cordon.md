@@ -246,22 +246,22 @@ kubectl get pods -A -o wide | grep <node-name>
 
 ```mermaid
 flowchart TD
-    Start([Start maintenance window]) --> Notify[Notify stakeholders\n& open change ticket]
+    Start([Start maintenance window]) --> Notify[Notify stakeholders & open change ticket]
     Notify --> Snapshot[Take etcd snapshot]
     Snapshot --> Cordon[kubectl cordon node]
     Cordon --> DryRun[kubectl drain --dry-run]
     DryRun --> Q1{Any PDB conflicts?}
-    Q1 -->|Yes| ResolvePDB[Adjust PDB or\nscale up replicas first]
+    Q1 -->|Yes| ResolvePDB[Adjust PDB or scale up replicas first]
     ResolvePDB --> DryRun
     Q1 -->|No| Drain[kubectl drain node]
     Drain --> Q2{Drain succeeded?}
-    Q2 -->|No| HandleStuck[Handle stuck pods\nsee §4]
+    Q2 -->|No| HandleStuck[Handle stuck pods see §4]
     HandleStuck --> Drain
-    Q2 -->|Yes| Work[Perform maintenance\nupgrade / OS patching]
-    Work --> Verify[Verify node health\njournalctl / dmesg]
+    Q2 -->|Yes| Work[Perform maintenance upgrade / OS patching]
+    Work --> Verify[Verify node health journalctl / dmesg]
     Verify --> Uncordon[kubectl uncordon node]
-    Uncordon --> SmokeTest[Run smoke tests\ncheck pod scheduling]
-    SmokeTest --> Close[Close change ticket\nNotify stakeholders]
+    Uncordon --> SmokeTest[Run smoke tests check pod scheduling]
+    SmokeTest --> Close[Close change ticket Notify stakeholders]
     Close --> Done([Maintenance complete])
 
     style Start fill:#cce5ff,stroke:#004085

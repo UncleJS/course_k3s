@@ -34,12 +34,12 @@ This lesson walks through a complete, realistic migration from a Podman-based wo
 
 ```mermaid
 flowchart LR
-    P1[Phase 1\nAssess] --> P2[Phase 2\nBuild & Push]
-    P2 --> P3[Phase 3\nWrite Manifests]
-    P3 --> P4[Phase 4\nStaging Test]
-    P4 --> P5[Phase 5\nData Migration]
-    P5 --> P6[Phase 6\nCutover]
-    P6 --> P7[Phase 7\nValidate]
+    P1[Phase 1 Assess] --> P2[Phase 2 Build & Push]
+    P2 --> P3[Phase 3 Write Manifests]
+    P3 --> P4[Phase 4 Staging Test]
+    P4 --> P5[Phase 5 Data Migration]
+    P5 --> P6[Phase 6 Cutover]
+    P6 --> P7[Phase 7 Validate]
     P6 -.->|if issues| RB[Rollback]
     RB -.-> P1
 
@@ -740,7 +740,7 @@ flowchart LR
     CI[CI/CD pipeline] -->|kubectl apply| MJ[Migration Job]
     MJ -->|kubectl wait --for=condition=complete| DONE{Complete?}
     DONE -->|Yes| APP[Deploy web Deployment]
-    DONE -->|No| FAIL[Pipeline fails\nrollback]
+    DONE -->|No| FAIL[Pipeline fails rollback]
 ```
 
 ```bash
@@ -1203,11 +1203,11 @@ Instead of a big-bang cutover, route a small percentage of traffic to the new k3
 ```mermaid
 flowchart TD
     subgraph Traefik
-        IR[IngressRoute\ntaskr.example.com]
+        IR[IngressRoute taskr.example.com]
     end
-    IR -->|90% traffic| OLD[web-stable\nPodman stack\nvia NodePort]
-    IR -->|10% traffic| NEW[web-canary\nk3s Deployment\n1 replica]
-    NEW -->|promote| FULL[web-stable\nk3s Deployment\n2 replicas]
+    IR -->|90% traffic| OLD[web-stable Podman stack via NodePort]
+    IR -->|10% traffic| NEW[web-canary k3s Deployment 1 replica]
+    NEW -->|promote| FULL[web-stable k3s Deployment 2 replicas]
 ```
 
 ```yaml

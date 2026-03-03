@@ -37,12 +37,12 @@ A k3s **agent** (worker) node:
 ```mermaid
 graph LR
     subgraph Control Plane
-        S[k3s server\n:6443 API\n:6444 supervisor]
+        S[k3s server :6443 API :6444 supervisor]
     end
     subgraph Workers
-        A1[k3s agent 1\nkubelet + containerd]
-        A2[k3s agent 2\nkubelet + containerd]
-        A3[k3s agent 3\nkubelet + containerd]
+        A1[k3s agent 1 kubelet + containerd]
+        A2[k3s agent 2 kubelet + containerd]
+        A3[k3s agent 3 kubelet + containerd]
     end
     A1 -- wss tunnel --> S
     A2 -- wss tunnel --> S

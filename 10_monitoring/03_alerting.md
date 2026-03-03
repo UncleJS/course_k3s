@@ -211,12 +211,12 @@ Routes define a tree of matchers. Alertmanager walks the tree top-to-bottom and 
 
 ```mermaid
 flowchart TD
-    IN[Incoming alert] --> ROOT[Root route\nreceiver: default]
+    IN[Incoming alert] --> ROOT[Root route receiver: default]
     ROOT --> R1{severity=critical?}
-    R1 -->|yes| C[Critical route\nreceiver: slack-critical + email]
+    R1 -->|yes| C[Critical route receiver: slack-critical + email]
     R1 -->|no| R2{severity=warning?}
-    R2 -->|yes| W[Warning route\nreceiver: slack-warnings]
-    R2 -->|no| D[Default route\nreceiver: slack-general]
+    R2 -->|yes| W[Warning route receiver: slack-warnings]
+    R2 -->|no| D[Default route receiver: slack-general]
 ```
 
 ### Receivers

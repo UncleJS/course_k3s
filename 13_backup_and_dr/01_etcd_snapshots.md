@@ -243,7 +243,7 @@ sequenceDiagram
     Operator->>Server2: sudo systemctl stop k3s
     Operator->>Server3: sudo systemctl stop k3s
 
-    Operator->>Server1: sudo k3s server --cluster-reset\n--cluster-reset-restore-path=<snapshot>
+    Operator->>Server1: sudo k3s server --cluster-reset --cluster-reset-restore-path=<snapshot>
     Server1->>Server1: Restore state from snapshot
     Server1->>Server1: Reset etcd cluster membership
 

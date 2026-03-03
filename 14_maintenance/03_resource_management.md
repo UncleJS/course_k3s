@@ -66,9 +66,9 @@ enforces minimum and maximum bounds.
 
 ```mermaid
 graph LR
-    LR[LimitRange\nin namespace] -->|injects defaults| C1[Container\nno resources set]
-    LR -->|validates| C2[Container\nwith resources]
-    C2 -->|rejected if outside\nmin/max bounds| API[API Server]
+    LR[LimitRange in namespace] -->|injects defaults| C1[Container no resources set]
+    LR -->|validates| C2[Container with resources]
+    C2 -->|rejected if outside min/max bounds| API[API Server]
     C1 -->|defaults applied| API
 ```
 
@@ -212,15 +212,15 @@ Combining LimitRange and ResourceQuota provides complete isolation between teams
 graph TD
     subgraph "Cluster"
         subgraph "namespace: team-a"
-            Q1[ResourceQuota\nCPU: 4 cores\nMemory: 8Gi\nPods: 20]
-            L1[LimitRange\nDefault: 100m/128Mi\nMax: 2/2Gi]
+            Q1[ResourceQuota CPU: 4 cores Memory: 8Gi Pods: 20]
+            L1[LimitRange Default: 100m/128Mi Max: 2/2Gi]
         end
         subgraph "namespace: team-b"
-            Q2[ResourceQuota\nCPU: 2 cores\nMemory: 4Gi\nPods: 10]
-            L2[LimitRange\nDefault: 50m/64Mi\nMax: 1/1Gi]
+            Q2[ResourceQuota CPU: 2 cores Memory: 4Gi Pods: 10]
+            L2[LimitRange Default: 50m/64Mi Max: 1/1Gi]
         end
         subgraph "namespace: kube-system"
-            NoQuota([No quota —\nSystem pods\nneed flexibility])
+            NoQuota([No quota — System pods need flexibility])
         end
     end
 ```
@@ -435,11 +435,11 @@ configuration. QoS determines eviction order under memory pressure.
 
 ```mermaid
 graph TD
-    P([Pod]) --> Q1{All containers\nhave requests = limits\nfor CPU AND memory?}
-    Q1 -->|Yes| Guaranteed[QoS: Guaranteed\nEvicted last]
-    Q1 -->|No| Q2{At least one container\nhas any requests or limits?}
-    Q2 -->|Yes| Burstable[QoS: Burstable\nEvicted second]
-    Q2 -->|No| BestEffort[QoS: BestEffort\nEvicted first]
+    P([Pod]) --> Q1{All containers have requests = limits for CPU AND memory?}
+    Q1 -->|Yes| Guaranteed[QoS: Guaranteed Evicted last]
+    Q1 -->|No| Q2{At least one container has any requests or limits?}
+    Q2 -->|Yes| Burstable[QoS: Burstable Evicted second]
+    Q2 -->|No| BestEffort[QoS: BestEffort Evicted first]
 
     style Guaranteed fill:#d4edda,stroke:#28a745
     style Burstable fill:#fff3cd,stroke:#ffc107

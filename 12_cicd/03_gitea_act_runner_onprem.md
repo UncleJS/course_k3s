@@ -46,17 +46,17 @@ Gitea is an open-source, self-hosted Git service written in Go. It provides:
 flowchart TD
     subgraph Cluster["k3s Cluster"]
         subgraph Gitea["Gitea (namespace: gitea)"]
-            GIT[Gitea Server\nGit + UI + API]
-            REG[Container Registry\nport 5000]
+            GIT[Gitea Server Git + UI + API]
+            REG[Container Registry port 5000]
             DB[(PostgreSQL)]
         end
 
         subgraph Runner["Act Runner (namespace: gitea)"]
-            AR[Act Runner\nworkflow executor]
+            AR[Act Runner workflow executor]
         end
 
         subgraph Apps["Application Namespace"]
-            DEPLOY[Your App\nDeployment]
+            DEPLOY[Your App Deployment]
         end
 
         AR -->|git clone| GIT

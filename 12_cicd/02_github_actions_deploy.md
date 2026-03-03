@@ -28,15 +28,15 @@ GitHub Actions is a CI/CD platform built into GitHub. Workflows are YAML files s
 ```mermaid
 flowchart TD
     subgraph GitHub
-        REPO[(Repository\n.github/workflows/)] -->|on: push| EVENT[Workflow trigger event]
+        REPO[(Repository .github/workflows/)] -->|on: push| EVENT[Workflow trigger event]
         EVENT --> QUEUE[Job queue]
     end
 
     subgraph Runner["GitHub-Hosted Runner (ubuntu-latest)"]
-        QUEUE --> JOB1[Job: test\nRun unit tests]
-        JOB1 -->|needs: test| JOB2[Job: build\nDocker build + push to GHCR]
-        JOB2 -->|needs: build| JOB3[Job: deploy\nHelm upgrade → k3s]
-        JOB3 --> JOB4[Job: notify\nSlack / GitHub status]
+        QUEUE --> JOB1[Job: test Run unit tests]
+        JOB1 -->|needs: test| JOB2[Job: build Docker build + push to GHCR]
+        JOB2 -->|needs: build| JOB3[Job: deploy Helm upgrade → k3s]
+        JOB3 --> JOB4[Job: notify Slack / GitHub status]
     end
 
     subgraph Cluster["k3s Cluster"]
@@ -45,7 +45,7 @@ flowchart TD
     end
 
     subgraph Registry
-        JOB2 -->|docker push| GHCR[(GHCR\nghcr.io)]
+        JOB2 -->|docker push| GHCR[(GHCR ghcr.io)]
         GHCR -->|imagePullSecrets| DEPLOY
     end
 ```

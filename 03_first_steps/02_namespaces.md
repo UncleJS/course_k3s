@@ -167,18 +167,18 @@ Resources in different namespaces are isolated by name but **not by network by d
 ```mermaid
 flowchart LR
     subgraph "namespace: frontend"
-        F_POD[frontend pod\n10.42.0.5]
-        F_SVC[svc: frontend\n10.43.0.10]
+        F_POD[frontend pod 10.42.0.5]
+        F_SVC[svc: frontend 10.43.0.10]
     end
     subgraph "namespace: backend"
-        B_POD[backend pod\n10.42.0.6]
-        B_SVC[svc: api\n10.43.0.20]
+        B_POD[backend pod 10.42.0.6]
+        B_SVC[svc: api 10.43.0.20]
     end
 
-    F_POD -->|"Can reach backend api\nbackend.svc.cluster.local"| B_SVC
+    F_POD -->|"Can reach backend api backend.svc.cluster.local"| B_SVC
     B_SVC --> B_POD
 
-    note["Network isolation requires\nNetworkPolicy resources\n(see Module 09)"]
+    note["Network isolation requires NetworkPolicy resources (see Module 09)"]
     style note fill:#fef3c7
 ```
 
@@ -271,15 +271,15 @@ graph TD
 
 ```mermaid
 flowchart TD
-    STRATEGY{Namespace Strategy} --> ENV[By Environment\ndev / staging / production]
-    STRATEGY --> TEAM[By Team\nplatform / frontend / backend]
-    STRATEGY --> APP[By Application\napp-a / app-b / monitoring]
-    STRATEGY --> COMBO[Combination\nteam-environment]
+    STRATEGY{Namespace Strategy} --> ENV[By Environment dev / staging / production]
+    STRATEGY --> TEAM[By Team platform / frontend / backend]
+    STRATEGY --> APP[By Application app-a / app-b / monitoring]
+    STRATEGY --> COMBO[Combination team-environment]
 
-    ENV --> ENV_NOTE["✓ Simple\n✓ Clear env separation\n✗ Multiple teams mix in one env"]
-    TEAM --> TEAM_NOTE["✓ Good for multi-team\n✓ Clear ownership\n✗ Env separation requires naming"]
-    APP --> APP_NOTE["✓ App-centric isolation\n✓ Easy cost tracking\n✗ Lots of namespaces at scale"]
-    COMBO --> COMBO_NOTE["✓ Best isolation\n✗ Many namespaces\n✗ More complex RBAC"]
+    ENV --> ENV_NOTE["✓ Simple ✓ Clear env separation ✗ Multiple teams mix in one env"]
+    TEAM --> TEAM_NOTE["✓ Good for multi-team ✓ Clear ownership ✗ Env separation requires naming"]
+    APP --> APP_NOTE["✓ App-centric isolation ✓ Easy cost tracking ✗ Lots of namespaces at scale"]
+    COMBO --> COMBO_NOTE["✓ Best isolation ✗ Many namespaces ✗ More complex RBAC"]
 ```
 
 **Recommended patterns:**

@@ -50,27 +50,27 @@ operates at the Kubernetes API level and can optionally back up PVC data.
 ```mermaid
 graph TD
     subgraph "Kubernetes Cluster"
-        VC[Velero Controller\nDeployment]
-        CR[Custom Resources\nBackup · Restore\nSchedule · BSL · VSL]
-        ND[Node Agent\nDaemonSet - Restic/Kopia]
+        VC[Velero Controller Deployment]
+        CR[Custom Resources Backup · Restore Schedule · BSL · VSL]
+        ND[Node Agent DaemonSet - Restic/Kopia]
         PVC[PersistentVolumes]
     end
 
     subgraph "Object Store"
-        S3[(S3 / MinIO\nBucket)]
+        S3[(S3 / MinIO Bucket)]
     end
 
     subgraph "Volume Snapshots"
-        VS[(CSI Snapshots\nor Cloud Provider)]
+        VS[(CSI Snapshots or Cloud Provider)]
     end
 
-    User((Operator)) -->|velero CLI\nor kubectl| CR
+    User((Operator)) -->|velero CLI or kubectl| CR
     CR -->|reconcile| VC
     VC -->|API objects| S3
     VC -->|triggers| ND
-    ND -->|file-level backup\nRestic/Kopia| PVC
+    ND -->|file-level backup Restic/Kopia| PVC
     ND -->|upload data| S3
-    VC -->|CSI VolumeSnapshot\nor provider snapshot| VS
+    VC -->|CSI VolumeSnapshot or provider snapshot| VS
 ```
 
 ### Key Components
@@ -520,10 +520,10 @@ The `node-agent` DaemonSet runs on each worker node. When a backup is triggered 
 graph LR
     subgraph Node
         NA[node-agent pod]
-        PV[(PVC data\non host path)]
+        PV[(PVC data on host path)]
     end
     NA -->|read files| PV
-    NA -->|deduplicated\nchunks| S3[(Object Store)]
+    NA -->|deduplicated chunks| S3[(Object Store)]
 ```
 
 ### Enabling Kopia for Specific Volumes

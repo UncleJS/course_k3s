@@ -72,10 +72,10 @@ The key insight: **you describe the end state, and k3s continuously works to mak
 
 ```mermaid
 flowchart LR
-    YAML[Desired State\nYAML file] --> API[API Server]
+    YAML[Desired State YAML file] --> API[API Server]
     API --> ETCD[(etcd / SQLite)]
     CTRL[Controller Manager] -->|watches| ETCD
-    CTRL -->|reconciles| ACTUAL[Actual State\nrunning containers]
+    CTRL -->|reconciles| ACTUAL[Actual State running containers]
     ACTUAL -->|reports back| ETCD
 ```
 
@@ -215,8 +215,8 @@ Pod IP: 10.42.1.15:80  →  ClusterIP Service: 10.43.12.5:80  →  NodePort: 192
 
 ```mermaid
 graph TD
-    EXT[External Client] -->|:80 / :443| TR[Traefik Ingress\nNodePort 80/443]
-    TR -->|ClusterIP route| SVC[Service\n10.43.12.5:80]
+    EXT[External Client] -->|:80 / :443| TR[Traefik Ingress NodePort 80/443]
+    TR -->|ClusterIP route| SVC[Service 10.43.12.5:80]
     SVC -->|iptables rules| P1[Pod 10.42.1.15]
     SVC -->|iptables rules| P2[Pod 10.42.2.8]
     SVC -->|iptables rules| P3[Pod 10.42.3.4]
@@ -244,18 +244,18 @@ k3s ships with **Flannel** as its default CNI (Container Network Interface) plug
 ```mermaid
 flowchart TB
     subgraph Node1["Node 1 (192.168.1.10)"]
-        P1[Pod A\n10.42.0.5] --- VETH1[veth pair]
-        P2[Pod B\n10.42.0.6] --- VETH2[veth pair]
-        VETH1 --- BRIDGE[cni0 bridge\n10.42.0.1/24]
+        P1[Pod A 10.42.0.5] --- VETH1[veth pair]
+        P2[Pod B 10.42.0.6] --- VETH2[veth pair]
+        VETH1 --- BRIDGE[cni0 bridge 10.42.0.1/24]
         VETH2 --- BRIDGE
-        BRIDGE --- FLANNEL1[flannel.1\nVXLAN overlay]
+        BRIDGE --- FLANNEL1[flannel.1 VXLAN overlay]
     end
     subgraph Node2["Node 2 (192.168.1.11)"]
-        P3[Pod C\n10.42.1.5] --- VETH3[veth pair]
-        VETH3 --- BRIDGE2[cni0 bridge\n10.42.1.1/24]
-        BRIDGE2 --- FLANNEL2[flannel.1\nVXLAN overlay]
+        P3[Pod C 10.42.1.5] --- VETH3[veth pair]
+        VETH3 --- BRIDGE2[cni0 bridge 10.42.1.1/24]
+        BRIDGE2 --- FLANNEL2[flannel.1 VXLAN overlay]
     end
-    FLANNEL1 -.->|UDP encapsulated\nVXLAN tunnel| FLANNEL2
+    FLANNEL1 -.->|UDP encapsulated VXLAN tunnel| FLANNEL2
 ```
 
 ### What Happens When a Pod Starts
@@ -428,10 +428,10 @@ Podman's biggest selling point over Docker is **rootless operation** — running
 
 ```mermaid
 flowchart LR
-    USER[Non-root user\nUID 1000] -->|podman run| NETNS[User namespace\nroot→UID 1000]
-    NETNS --> CGROUP[cgroup v2\nuser slice]
-    NETNS --> SLIRP[slirp4netns\nor pasta - network]
-    CGROUP --> CONT[Container process\nseems like root\nbut is UID 1000 on host]
+    USER[Non-root user UID 1000] -->|podman run| NETNS[User namespace root→UID 1000]
+    NETNS --> CGROUP[cgroup v2 user slice]
+    NETNS --> SLIRP[slirp4netns or pasta - network]
+    CGROUP --> CONT[Container process seems like root but is UID 1000 on host]
 ```
 
 Key mechanisms:
@@ -587,11 +587,11 @@ Podman has no concept of scheduling — a container runs on whatever machine you
 
 ```mermaid
 flowchart TD
-    POD[Unscheduled Pod] --> FILT[Filtering\nWhich nodes can run this pod?]
+    POD[Unscheduled Pod] --> FILT[Filtering Which nodes can run this pod?]
     FILT -->|Node has enough CPU/memory| N1[Node 1]
     FILT -->|Node selector matches| N2[Node 2]
     FILT -->|No taint blocking it| N3[Node 3]
-    N1 & N2 & N3 --> SCORE[Scoring\nWhich feasible node is best?]
+    N1 & N2 & N3 --> SCORE[Scoring Which feasible node is best?]
     SCORE -->|Least loaded| WINNER[Winning Node]
     WINNER --> BIND[Pod bound to node]
 ```
@@ -674,9 +674,9 @@ Every k3s Pod contains a hidden container called the **pause container** (also c
 ```mermaid
 graph TD
     subgraph Pod["Pod (shared namespaces)"]
-        PAUSE["pause container\n(gcr.io/pause:3.x)\nHolds network namespace"]
-        APP["app container\nshares network ns"]
-        SIDECAR["sidecar container\nshares network ns"]
+        PAUSE["pause container (gcr.io/pause:3.x) Holds network namespace"]
+        APP["app container shares network ns"]
+        SIDECAR["sidecar container shares network ns"]
         PAUSE -.->|net ns shared| APP
         PAUSE -.->|net ns shared| SIDECAR
     end

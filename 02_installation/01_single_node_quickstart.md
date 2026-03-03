@@ -49,13 +49,13 @@ sudo sed -i '/ swap / s/^\(.*\)$/#\1/' /etc/fstab
 flowchart TD
     A([Start Install]) --> B{Internet access?}
     B -->|Yes| C{Root or sudo?}
-    B -->|No| AIRGAP[See Air-Gap Install\nModule 02 Lesson 03]
+    B -->|No| AIRGAP[See Air-Gap Install Module 02 Lesson 03]
 
     C -->|Yes| D{Specific version?}
-    C -->|No| ROOTLESS[Rootless Mode\nAdvanced - see docs]
+    C -->|No| ROOTLESS[Rootless Mode Advanced - see docs]
 
-    D -->|Latest stable| SCRIPT[Method 1:\nInstaller Script]
-    D -->|Specific version| MANUAL[Method 2:\nManual Binary]
+    D -->|Latest stable| SCRIPT[Method 1: Installer Script]
+    D -->|Specific version| MANUAL[Method 2: Manual Binary]
 
     SCRIPT --> VERIFY[Verify Installation]
     MANUAL --> VERIFY
@@ -106,14 +106,14 @@ curl -sfL https://get.k3s.io | sh -s - \
 
 ```mermaid
 flowchart TD
-    A[curl installer script] --> B[Download k3s binary\nto /usr/local/bin/k3s]
+    A[curl installer script] --> B[Download k3s binary to /usr/local/bin/k3s]
     B --> C[Create kubectl, crictl, ctr symlinks]
     C --> D[Write /etc/systemd/system/k3s.service]
     D --> E[systemctl daemon-reload]
     E --> F[systemctl enable k3s]
     F --> G[systemctl start k3s]
     G --> H[Wait for API server to be ready]
-    H --> I[Write kubeconfig to\n/etc/rancher/k3s/k3s.yaml]
+    H --> I[Write kubeconfig to /etc/rancher/k3s/k3s.yaml]
     I --> J([Install complete!])
 
     style J fill:#22c55e,color:#fff

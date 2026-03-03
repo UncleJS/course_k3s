@@ -58,10 +58,10 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    POD[Pod DNS query] --> COREDNS[CoreDNS Pod\nkube-system]
+    POD[Pod DNS query] --> COREDNS[CoreDNS Pod kube-system]
     COREDNS --> ZONES{Zone?}
-    ZONES -->|"*.cluster.local"| K8S[kubernetes plugin\nWatch API for Services]
-    ZONES -->|"External domain"| FWD[forward plugin\nUpstream DNS]
+    ZONES -->|"*.cluster.local"| K8S[kubernetes plugin Watch API for Services]
+    ZONES -->|"External domain"| FWD[forward plugin Upstream DNS]
     ZONES -->|"Custom zone"| CUSTOM[Custom hosts/rewrite rules]
     K8S --> SVC[Return ClusterIP or Pod IP]
     FWD --> UPSTREAM[8.8.8.8, 1.1.1.1, etc.]
@@ -261,7 +261,7 @@ The `ndots:5` setting means: if the name has fewer than 5 dots, try appending se
 
 ```mermaid
 flowchart TD
-    Q["Query: google.com"] --> DOTS{Count dots\n< 5?}
+    Q["Query: google.com"] --> DOTS{Count dots < 5?}
     DOTS -->|"Yes (1 dot)"| S1["Try: google.com.default.svc.cluster.local"]
     S1 -->|"Not found"| S2["Try: google.com.svc.cluster.local"]
     S2 -->|"Not found"| S3["Try: google.com.cluster.local"]

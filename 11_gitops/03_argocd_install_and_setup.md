@@ -37,12 +37,12 @@ graph TD
     end
 
     subgraph ArgoCD["ArgoCD (namespace: argocd)"]
-        API[argocd-server\nAPI + Web UI]
-        REPO_SRV[argocd-repo-server\nclones + renders manifests]
-        APP_CTRL[argocd-application-controller\nreconciles + syncs]
-        REDIS[(Redis\ncache)]
-        DEXSERVER[dex-server\nOIDC / OAuth2 auth]
-        NOTIF[notifications-controller\nalerts]
+        API[argocd-server API + Web UI]
+        REPO_SRV[argocd-repo-server clones + renders manifests]
+        APP_CTRL[argocd-application-controller reconciles + syncs]
+        REDIS[(Redis cache)]
+        DEXSERVER[dex-server OIDC / OAuth2 auth]
+        NOTIF[notifications-controller alerts]
     end
 
     subgraph Target["Target Cluster(s)"]
@@ -103,7 +103,8 @@ kubectl create namespace argocd
 ```bash
 helm install argocd argo/argo-cd \
   --namespace argocd \
-  --version 6.7.x \              # pin a version
+  # pin a version
+  --version 6.7.x \
   --set server.service.type=NodePort \
   --set server.service.nodePortHttp=30080 \
   --set server.service.nodePortHttps=30443

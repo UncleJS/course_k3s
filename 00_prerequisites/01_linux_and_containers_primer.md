@@ -157,7 +157,7 @@ graph TB
     L3["Layer 3: COPY index.html /usr/share/nginx/html"]
     L4["Layer 4: CMD nginx -g 'daemon off;'"]
     L1 --> L2 --> L3 --> L4
-    L4 --> R["Runtime Container\n(writable layer on top)"]
+    L4 --> R["Runtime Container (writable layer on top)"]
 
     style R fill:#6366f1,color:#fff
 ```

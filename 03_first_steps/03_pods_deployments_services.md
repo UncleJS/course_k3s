@@ -118,12 +118,12 @@ A **ReplicaSet** ensures a specified number of pod replicas are running at all t
 
 ```mermaid
 graph TD
-    RS[ReplicaSet\nreplicas: 3] --> P1[Pod 1\nRunning]
-    RS --> P2[Pod 2\nRunning]
-    RS --> P3[Pod 3\nRunning]
+    RS[ReplicaSet replicas: 3] --> P1[Pod 1 Running]
+    RS --> P2[Pod 2 Running]
+    RS --> P3[Pod 3 Running]
     P2 -->|"Crash!"| DEAD[Pod 2 Dead]
     DEAD -->|"Controller detects"| RS
-    RS -->|"Creates new pod"| P4[Pod 4\nRunning]
+    RS -->|"Creates new pod"| P4[Pod 4 Running]
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -260,10 +260,10 @@ A **Service** provides a stable IP and DNS name for a set of pods. Pods come and
 
 ```mermaid
 graph LR
-    CLIENT[Client] -->|"ClusterIP: 10.43.0.50:80"| SVC[Service\napp=my-app]
-    SVC --> P1[Pod 1\n10.42.0.5]
-    SVC --> P2[Pod 2\n10.42.0.6]
-    SVC --> P3[Pod 3\n10.42.0.7]
+    CLIENT[Client] -->|"ClusterIP: 10.43.0.50:80"| SVC[Service app=my-app]
+    SVC --> P1[Pod 1 10.42.0.5]
+    SVC --> P2[Pod 2 10.42.0.6]
+    SVC --> P3[Pod 3 10.42.0.7]
 
     style SVC fill:#6366f1,color:#fff
 ```
@@ -334,10 +334,10 @@ The key mechanism is **label selectors**. A Service routes to all pods matching 
 
 ```mermaid
 flowchart LR
-    SVC["Service\nselector:\n  app: my-app"]
-    P1["Pod 1\nlabels:\n  app: my-app ✓"]
-    P2["Pod 2\nlabels:\n  app: my-app ✓"]
-    P3["Pod 3\nlabels:\n  app: other ✗"]
+    SVC["Service selector:   app: my-app"]
+    P1["Pod 1 labels:   app: my-app ✓"]
+    P2["Pod 2 labels:   app: my-app ✓"]
+    P3["Pod 3 labels:   app: other ✗"]
 
     SVC --> P1 & P2
     SVC -.->|"NOT selected"| P3
@@ -461,13 +461,13 @@ A complete, realistic example combining all the above:
 
 ```mermaid
 flowchart TD
-    I[Ingress\napp.example.com] --> SVC[Service\napp:80]
-    SVC --> D[Deployment\nreplicas: 3]
+    I[Ingress app.example.com] --> SVC[Service app:80]
+    SVC --> D[Deployment replicas: 3]
     D --> P1[Pod 1]
     D --> P2[Pod 2]
     D --> P3[Pod 3]
-    P1 & P2 & P3 --> CM[ConfigMap\napp-config]
-    P1 & P2 & P3 --> SEC[Secret\ndb-creds]
+    P1 & P2 & P3 --> CM[ConfigMap app-config]
+    P1 & P2 & P3 --> SEC[Secret db-creds]
 ```
 
 ```bash

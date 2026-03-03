@@ -66,7 +66,7 @@ flowchart LR
         A[Container] -->|host.docker.internal:5432| B[Host PostgreSQL]
     end
     subgraph k3s
-        C[Pod] -->|postgres-svc.taskr.svc.cluster.local:5432| D[PostgreSQL Pod\nin cluster]
+        C[Pod] -->|postgres-svc.taskr.svc.cluster.local:5432| D[PostgreSQL Pod in cluster]
         C -. "❌ no equivalent" .-> E[Host PostgreSQL]
     end
     style E fill:#7f1d1d,color:#fca5a5
@@ -156,7 +156,7 @@ In k3s, the equivalent would be mounting the containerd socket or the CRI socket
 
 ```mermaid
 flowchart TD
-    A[Container with\n/var/run/docker.sock mounted] -->|docker run --privileged\n-v /:/host| B[Full host access\nROOT ESCAPE]
+    A[Container with /var/run/docker.sock mounted] -->|docker run --privileged -v /:/host| B[Full host access ROOT ESCAPE]
     style A fill:#7c2d12,color:#fed7aa
     style B fill:#7f1d1d,color:#fca5a5
 ```
@@ -219,7 +219,7 @@ flowchart LR
         C[Pod :3000] -->|ClusterIP Service| D[internal only]
         C -->|NodePort Service| E[nodeIP:30080]
         C -->|Ingress / LoadBalancer| F[taskr.local]
-        C -->|kubectl port-forward| G[localhost:8080\ndev only]
+        C -->|kubectl port-forward| G[localhost:8080 dev only]
     end
 ```
 
@@ -322,10 +322,10 @@ Docker Compose's `restart:` maps to `restartPolicy` in a Pod spec, but the seman
 ```mermaid
 flowchart TD
     A[Container exits] --> B{restartPolicy?}
-    B -->|Always| C[CrashLoopBackOff\nif repeated failures]
-    B -->|OnFailure| D[Restart on non-zero exit\nstop on exit 0]
-    B -->|Never| E[Pod status: Completed\nor Failed — no restart]
-    C --> F[Exponential backoff\n10s → 20s → 40s → 5min max]
+    B -->|Always| C[CrashLoopBackOff if repeated failures]
+    B -->|OnFailure| D[Restart on non-zero exit stop on exit 0]
+    B -->|Never| E[Pod status: Completed or Failed — no restart]
+    C --> F[Exponential backoff 10s → 20s → 40s → 5min max]
     style C fill:#7c2d12,color:#fed7aa
     style E fill:#14532d,color:#86efac
 ```
@@ -630,7 +630,7 @@ spec:
 ```mermaid
 flowchart TD
     A[DinD / socket mount] -->|requires| B[privileged: true]
-    B -->|grants| C[Full host access\nKernel capabilities\nMount any path]
+    B -->|grants| C[Full host access Kernel capabilities Mount any path]
     C --> D[🚨 Security violation]
 
     E[Kaniko] -->|runs as| F[unprivileged container]

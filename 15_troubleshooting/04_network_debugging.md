@@ -20,32 +20,32 @@
 flowchart TD
     Start([Network issue reported]) --> Classify{What is failing?}
 
-    Classify -->|Pod cannot reach\nanother pod| PP[Pod-to-Pod]
-    Classify -->|Pod cannot reach\na Service| PS[Pod-to-Service]
-    Classify -->|Service not reachable\nfrom outside| EXT[External Access]
+    Classify -->|Pod cannot reach another pod| PP[Pod-to-Pod]
+    Classify -->|Pod cannot reach a Service| PS[Pod-to-Service]
+    Classify -->|Service not reachable from outside| EXT[External Access]
     Classify -->|DNS not resolving| DNS[DNS Issue]
 
     PP --> PP1[Check both pods are Running]
     PP1 --> PP2[kubectl exec pod-a -- ping <pod-b-ip>]
     PP2 --> PP3{Ping works?}
-    PP3 -->|Yes| PP4[Check app-level\nconnection / port]
-    PP3 -->|No| PP5[Check Flannel CNI\nlogs and state]
-    PP5 --> PP6[Check node-to-node\nnetwork connectivity]
+    PP3 -->|Yes| PP4[Check app-level connection / port]
+    PP3 -->|No| PP5[Check Flannel CNI logs and state]
+    PP5 --> PP6[Check node-to-node network connectivity]
 
     PS --> PS1[kubectl get endpoints <svc>]
     PS1 --> PS2{Endpoints populated?}
-    PS2 -->|No| PS3[Fix selector /\nlabels mismatch]
-    PS2 -->|Yes| PS4[Check kube-proxy iptables\nor IPVS rules on node]
+    PS2 -->|No| PS3[Fix selector / labels mismatch]
+    PS2 -->|Yes| PS4[Check kube-proxy iptables or IPVS rules on node]
     PS4 --> PS5[kubectl exec -- curl <svc-cluster-ip>]
 
-    EXT --> EXT1[kubectl get ingress\nkubectl get svc]
-    EXT1 --> EXT2[Check Traefik logs\nand IngressRoute]
-    EXT2 --> EXT3[Check TLS certificate\nand host header]
+    EXT --> EXT1[kubectl get ingress kubectl get svc]
+    EXT1 --> EXT2[Check Traefik logs and IngressRoute]
+    EXT2 --> EXT3[Check TLS certificate and host header]
 
     DNS --> DNS1[kubectl exec -- nslookup <svc>]
     DNS1 --> DNS2{Returns NXDOMAIN?}
-    DNS2 -->|Yes| DNS3[Check CoreDNS pods\nand ConfigMap]
-    DNS2 -->|Timeout| DNS4[Check network to\nCoreDNS ClusterIP]
+    DNS2 -->|Yes| DNS3[Check CoreDNS pods and ConfigMap]
+    DNS2 -->|Timeout| DNS4[Check network to CoreDNS ClusterIP]
 
     style Start fill:#cce5ff,stroke:#004085
     style PP5 fill:#f8d7da,stroke:#dc3545

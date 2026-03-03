@@ -22,22 +22,22 @@
 ```mermaid
 graph LR
     subgraph K8S["Upstream Kubernetes"]
-        k8s_bin["Multiple binaries\n(7+ processes)"]
+        k8s_bin["Multiple binaries (7+ processes)"]
         k8s_ram["RAM: 2+ GB recommended"]
-        k8s_etcd["etcd required\n(external or managed)"]
-        k8s_cni["CNI: bring your own\n(Calico, Cilium, Flannel…)"]
-        k8s_ing["Ingress: bring your own\n(nginx, traefik, haproxy…)"]
-        k8s_lb["LoadBalancer: cloud\nor MetalLB"]
-        k8s_str["Storage: external\nprovisioner required"]
+        k8s_etcd["etcd required (external or managed)"]
+        k8s_cni["CNI: bring your own (Calico, Cilium, Flannel…)"]
+        k8s_ing["Ingress: bring your own (nginx, traefik, haproxy…)"]
+        k8s_lb["LoadBalancer: cloud or MetalLB"]
+        k8s_str["Storage: external provisioner required"]
     end
     subgraph K3S["k3s"]
-        k3s_bin["Single binary\n(< 100 MB)"]
+        k3s_bin["Single binary (< 100 MB)"]
         k3s_ram["RAM: 512 MB minimum"]
-        k3s_etcd["SQLite (default)\nor embedded etcd (HA)"]
-        k3s_cni["CNI: Flannel\n(built-in)"]
-        k3s_ing["Ingress: Traefik\n(built-in)"]
-        k3s_lb["LoadBalancer: Klipper\n(built-in)"]
-        k3s_str["Storage: local-path\n(built-in)"]
+        k3s_etcd["SQLite (default) or embedded etcd (HA)"]
+        k3s_cni["CNI: Flannel (built-in)"]
+        k3s_ing["Ingress: Traefik (built-in)"]
+        k3s_lb["LoadBalancer: Klipper (built-in)"]
+        k3s_str["Storage: local-path (built-in)"]
     end
     style K3S fill:#dcfce7
     style K8S fill:#fef3c7
@@ -70,16 +70,16 @@ k3s is not just "smaller k8s" — it deliberately removes or replaces certain co
 ```mermaid
 flowchart TD
     K8S[Upstream Kubernetes] --> REMOVE["Removed from k3s"]
-    REMOVE --> R1["Alpha/deprecated APIs\n(cloud provider integrations)"]
-    REMOVE --> R2["In-tree volume plugins\n(replaced by CSI)"]
-    REMOVE --> R3["Most cloud-provider\nspecific code"]
-    REMOVE --> R4["Legacy admission plugins\n(only essential ones kept)"]
+    REMOVE --> R1["Alpha/deprecated APIs (cloud provider integrations)"]
+    REMOVE --> R2["In-tree volume plugins (replaced by CSI)"]
+    REMOVE --> R3["Most cloud-provider specific code"]
+    REMOVE --> R4["Legacy admission plugins (only essential ones kept)"]
 
     K8S --> REPLACED["Replaced in k3s"]
-    REPLACED --> P1["etcd → SQLite\n(single-node default)"]
-    REPLACED --> P2["External CNI → Flannel\n(built-in)"]
-    REPLACED --> P3["External Ingress → Traefik\n(built-in)"]
-    REPLACED --> P4["External LB → Klipper\n(built-in)"]
+    REPLACED --> P1["etcd → SQLite (single-node default)"]
+    REPLACED --> P2["External CNI → Flannel (built-in)"]
+    REPLACED --> P3["External Ingress → Traefik (built-in)"]
+    REPLACED --> P4["External LB → Klipper (built-in)"]
 
     style REMOVE fill:#fee2e2
     style REPLACED fill:#fef3c7
@@ -167,7 +167,7 @@ This is the most significant architectural difference:
 ```mermaid
 flowchart TD
     subgraph "Single Node k3s (default)"
-        A[k3s server] --> B[(SQLite\n/var/lib/rancher/k3s/server/db/state.db)]
+        A[k3s server] --> B[(SQLite /var/lib/rancher/k3s/server/db/state.db)]
     end
     subgraph "HA k3s (embedded etcd)"
         S1[k3s server 1] --> E1[(etcd member 1)]
@@ -176,7 +176,7 @@ flowchart TD
         E1 <--> E2 <--> E3
     end
     subgraph "k3s with external DB"
-        S4[k3s server 1] --> PG[(PostgreSQL\nor MySQL)]
+        S4[k3s server 1] --> PG[(PostgreSQL or MySQL)]
         S5[k3s server 2] --> PG
     end
     subgraph "Upstream k8s"
@@ -236,7 +236,7 @@ You can **replace** Flannel with Calico or Cilium in k3s if you need:
 flowchart TD
     Q1{Cluster size?}
     Q1 -->|"< 100 nodes"| Q2
-    Q1 -->|"100+ nodes"| FULLK8S[Consider full k8s\nor managed service]
+    Q1 -->|"100+ nodes"| FULLK8S[Consider full k8s or managed service]
 
     Q2{Resource constrained?}
     Q2 -->|"Yes — edge/IoT/Pi"| K3S_YES[k3s ✅]
@@ -246,11 +246,11 @@ flowchart TD
     Q3 -->|"Yes — minimal ops"| K3S_YES2[k3s ✅]
     Q3 -->|"No — full control"| Q4
 
-    Q4{Air-gapped or\non-prem?}
+    Q4{Air-gapped or on-prem?}
     Q4 -->|"Yes"| K3S_YES3[k3s ✅]
     Q4 -->|"No — cloud native"| Q5
 
-    Q5{Advanced CNI\n(eBPF/Cilium)?}
+    Q5{Advanced CNI (eBPF/Cilium)?}
     Q5 -->|"Yes — built-in"| MANAGED[EKS / GKE / AKS]
     Q5 -->|"Configurable"| K3S_YES4[k3s + Cilium ✅]
 

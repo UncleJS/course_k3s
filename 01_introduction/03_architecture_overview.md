@@ -83,18 +83,18 @@ A k3s server node runs these components inside a single `k3s` process:
 ```mermaid
 flowchart TD
     K3S["k3s server process (PID 1)"]
-    K3S --> API["kube-apiserver\nREST API :6443\nValidates & stores resources"]
-    K3S --> SCH["kube-scheduler\nWatches unscheduled Pods\nAssigns to Nodes"]
-    K3S --> CM["kube-controller-manager\nDeployment controller\nNode controller\nEndpoint controller\netc."]
-    K3S --> DS["Datastore\nSQLite (default)\netcd (HA mode)"]
-    K3S --> KL["kubelet (local agent)\nManages Pods on this node"]
-    K3S --> KP["kube-proxy\nManages iptables/nftables rules"]
-    K3S --> CD["containerd\nPulls images\nStarts containers"]
-    K3S --> FL["Flannel CNI\nPod network overlay"]
-    K3S --> TR["Traefik Ingress\n(deployed as Pod)"]
-    K3S --> DNS["CoreDNS\n(deployed as Pod)"]
-    K3S --> LB["Klipper LoadBalancer\n(deployed as Pod)"]
-    K3S --> SP["local-path-provisioner\n(deployed as Pod)"]
+    K3S --> API["kube-apiserver REST API :6443 Validates & stores resources"]
+    K3S --> SCH["kube-scheduler Watches unscheduled Pods Assigns to Nodes"]
+    K3S --> CM["kube-controller-manager Deployment controller Node controller Endpoint controller etc."]
+    K3S --> DS["Datastore SQLite (default) etcd (HA mode)"]
+    K3S --> KL["kubelet (local agent) Manages Pods on this node"]
+    K3S --> KP["kube-proxy Manages iptables/nftables rules"]
+    K3S --> CD["containerd Pulls images Starts containers"]
+    K3S --> FL["Flannel CNI Pod network overlay"]
+    K3S --> TR["Traefik Ingress (deployed as Pod)"]
+    K3S --> DNS["CoreDNS (deployed as Pod)"]
+    K3S --> LB["Klipper LoadBalancer (deployed as Pod)"]
+    K3S --> SP["local-path-provisioner (deployed as Pod)"]
 
     style K3S fill:#6366f1,color:#fff
     style DS fill:#f59e0b,color:#fff
@@ -106,7 +106,8 @@ flowchart TD
 |------|---------|
 | `/etc/rancher/k3s/k3s.yaml` | Kubeconfig file for kubectl |
 | `/var/lib/rancher/k3s/server/` | Server data (etcd/SQLite, certs, tokens) |
-| `/var/lib/rancher/k3s/server/token` | Node join token |
+| `/var/lib/rancher/k3s/server/node-token` | Node join token (agents) |
+| `/var/lib/rancher/k3s/server/token` | Server join token |
 | `/var/lib/rancher/k3s/server/manifests/` | Auto-deploy manifests directory |
 | `/var/lib/rancher/k3s/server/tls/` | Cluster TLS certificates |
 | `/etc/rancher/k3s/config.yaml` | k3s configuration file |
@@ -122,10 +123,10 @@ A k3s agent node runs a subset of components:
 ```mermaid
 flowchart TD
     K3SA["k3s agent process"]
-    K3SA --> KL["kubelet\nRegisters with API server\nManages Pod lifecycle\nReports node status"]
-    K3SA --> KP["kube-proxy\nSyncs Service iptables rules\nEnables ClusterIP routing"]
-    K3SA --> CD["containerd\nPulls container images\nStarts/stops containers"]
-    K3SA --> FL["Flannel CNI\nAssigns Pod CIDRs\nCreates VXLAN tunnel"]
+    K3SA --> KL["kubelet Registers with API server Manages Pod lifecycle Reports node status"]
+    K3SA --> KP["kube-proxy Syncs Service iptables rules Enables ClusterIP routing"]
+    K3SA --> CD["containerd Pulls container images Starts/stops containers"]
+    K3SA --> FL["Flannel CNI Assigns Pod CIDRs Creates VXLAN tunnel"]
 
     KL -->|"CRI calls"| CD
     FL -->|"Network setup"| KL
@@ -225,30 +226,30 @@ Klipper assigns the node's IP as the `LoadBalancer` IP for `Service` objects of 
 ```mermaid
 graph TB
     subgraph "External"
-        CLIENT[Client Browser\n203.0.113.1]
+        CLIENT[Client Browser 203.0.113.1]
     end
 
     subgraph "Node (192.168.1.10)"
-        IPTABLES[iptables / nftables\nkube-proxy rules]
+        IPTABLES[iptables / nftables kube-proxy rules]
 
         subgraph "Pod Network 10.42.0.0/24"
-            POD1[Pod A\n10.42.0.5]
-            POD2[Pod B\n10.42.0.6]
+            POD1[Pod A 10.42.0.5]
+            POD2[Pod B 10.42.0.6]
         end
 
         subgraph "Services 10.43.0.0/16"
-            SVC[ClusterIP Service\n10.43.0.25:80]
+            SVC[ClusterIP Service 10.43.0.25:80]
         end
 
         TR[Traefik :80/:443]
-        VXLAN[flannel.1\nVXLAN interface]
+        VXLAN[flannel.1 VXLAN interface]
     end
 
     subgraph "Node 2 (192.168.1.11)"
         subgraph "Pod Network 10.42.1.0/24"
-            POD3[Pod C\n10.42.1.5]
+            POD3[Pod C 10.42.1.5]
         end
-        VXLAN2[flannel.1\nVXLAN interface]
+        VXLAN2[flannel.1 VXLAN interface]
     end
 
     CLIENT -->|":80"| TR
@@ -271,10 +272,10 @@ graph TB
 flowchart TD
     POD[Pod requests PVC]
     PVC[PersistentVolumeClaim]
-    SC[StorageClass\nlocal-path]
+    SC[StorageClass local-path]
     PROV[local-path-provisioner]
     PV[PersistentVolume]
-    DIR["/opt/local-path-provisioner/uuid\non node filesystem"]
+    DIR["/opt/local-path-provisioner/uuid on node filesystem"]
 
     POD --> PVC
     PVC --> SC
@@ -344,19 +345,19 @@ When running k3s in HA mode (3+ server nodes with embedded etcd):
 ```mermaid
 graph TB
     subgraph "Load Balancer (optional)"
-        LB[nginx / HAProxy\n192.168.1.100:6443]
+        LB[nginx / HAProxy 192.168.1.100:6443]
     end
 
     subgraph "Server Nodes"
-        S1["Server 1\n192.168.1.10\nActive"]
-        S2["Server 2\n192.168.1.11\nActive"]
-        S3["Server 3\n192.168.1.12\nActive"]
+        S1["Server 1 192.168.1.10 Active"]
+        S2["Server 2 192.168.1.11 Active"]
+        S3["Server 3 192.168.1.12 Active"]
     end
 
     subgraph "etcd Cluster"
-        E1[(etcd 1\nLeader)]
-        E2[(etcd 2\nFollower)]
-        E3[(etcd 3\nFollower)]
+        E1[(etcd 1 Leader)]
+        E2[(etcd 2 Follower)]
+        E3[(etcd 3 Follower)]
     end
 
     subgraph "Agent Nodes"
@@ -397,7 +398,7 @@ HA requirements:
 | Single server = single point of failure | SQLite on one server has no HA. Use embedded etcd with 3 servers for production |
 | Flannel VXLAN blocked | UDP port 8472 must be open between nodes for pod-to-pod communication |
 | API server port blocked | TCP 6443 must be open from agents to servers |
-| Node token exposure | `/var/lib/rancher/k3s/server/token` must be kept secret — it allows any machine to join the cluster |
+| Node token exposure | `/var/lib/rancher/k3s/server/node-token` (and `/var/lib/rancher/k3s/server/token`) must be kept secret — they allow machines to join the cluster |
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

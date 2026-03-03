@@ -30,10 +30,10 @@ k3s ships with **etcd compiled in**. When you start a server with `--cluster-ini
 
 ```mermaid
 graph TD
-    LB[Load Balancer / VIP\n:6443]
-    LB --> S1[k3s server-01\netcd member + API]
-    LB --> S2[k3s server-02\netcd member + API]
-    LB --> S3[k3s server-03\netcd member + API]
+    LB[Load Balancer / VIP :6443]
+    LB --> S1[k3s server-01 etcd member + API]
+    LB --> S2[k3s server-02 etcd member + API]
+    LB --> S3[k3s server-03 etcd member + API]
     S1 <-->|etcd Raft| S2
     S2 <-->|etcd Raft| S3
     S3 <-->|etcd Raft| S1

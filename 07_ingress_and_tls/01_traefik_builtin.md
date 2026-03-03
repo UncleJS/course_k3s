@@ -30,10 +30,10 @@ An Ingress Controller is a reverse proxy deployed inside the cluster that watche
 ```mermaid
 graph LR
     Internet -->|:80 / :443| LB[LoadBalancer / NodePort]
-    LB --> TC[Traefik Controller\nkube-system namespace]
-    TC -->|Route: /api| SVC1[backend-service\n:8080]
-    TC -->|Route: /| SVC2[frontend-service\n:3000]
-    TC -->|Host: admin.example.com| SVC3[admin-service\n:9000]
+    LB --> TC[Traefik Controller kube-system namespace]
+    TC -->|Route: /api| SVC1[backend-service :8080]
+    TC -->|Route: /| SVC2[frontend-service :3000]
+    TC -->|Host: admin.example.com| SVC3[admin-service :9000]
 ```
 
 Without an Ingress controller, you'd need a separate `LoadBalancer` or `NodePort` service for every application.
@@ -68,10 +68,10 @@ kubectl get svc -n kube-system traefik
 ```mermaid
 graph TD
     subgraph Traefik v2
-        EP[EntryPoints\n:80 web\n:443 websecure]
-        R[Routers\nHost / PathPrefix rules]
-        M[Middlewares\nRedirect, Auth, RateLimit]
-        SVC[Services\nLoad balance to pods]
+        EP[EntryPoints :80 web :443 websecure]
+        R[Routers Host / PathPrefix rules]
+        M[Middlewares Redirect, Auth, RateLimit]
+        SVC[Services Load balance to pods]
     end
     EP --> R --> M --> SVC
 ```

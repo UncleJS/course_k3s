@@ -59,13 +59,13 @@ k3s v1.25+ ships with PSA enabled. No additional components or controllers are r
 ```mermaid
 graph TD
     subgraph "Privileged"
-        P[No restrictions\nFull host access allowed\nFor trusted system components]
+        P[No restrictions Full host access allowed For trusted system components]
     end
     subgraph "Baseline"
-        B[Prevents known privilege escalations\nBlocks hostNetwork/PID/IPC\nBlocks privileged containers\nAllows most workloads]
+        B[Prevents known privilege escalations Blocks hostNetwork/PID/IPC Blocks privileged containers Allows most workloads]
     end
     subgraph "Restricted"
-        R[Hardened best-practices\nRequires non-root user\nRequires seccomp profile\nDrops all capabilities\nRead-only root FS recommended]
+        R[Hardened best-practices Requires non-root user Requires seccomp profile Drops all capabilities Read-only root FS recommended]
     end
 
     P --> B --> R
@@ -118,14 +118,14 @@ PSA operates as a built-in admission webhook that intercepts pod creation/modifi
 sequenceDiagram
     participant User
     participant API as API Server
-    participant PSA as Pod Security\nAdmission
-    participant NS as Namespace\n(labels)
+    participant PSA as Pod Security Admission
+    participant NS as Namespace (labels)
 
     User->>API: kubectl apply pod.yaml
     API->>PSA: Admit pod?
     PSA->>NS: Read security labels
-    NS-->>PSA: enforce=restricted\nwarn=restricted\naudit=restricted
-    PSA->>PSA: Evaluate pod spec\nagainst policy level
+    NS-->>PSA: enforce=restricted warn=restricted audit=restricted
+    PSA->>PSA: Evaluate pod spec against policy level
     alt Pod meets policy
         PSA-->>API: Allow
         API-->>User: pod/my-pod created
@@ -223,10 +223,10 @@ kubectl label namespace my-app \
 ```mermaid
 graph LR
     subgraph "Pod-level (spec.securityContext)"
-        PN[runAsUser\nrunAsGroup\nrunAsNonRoot\nfsGroup\nseccompProfile\nsysctls]
+        PN[runAsUser runAsGroup runAsNonRoot fsGroup seccompProfile sysctls]
     end
     subgraph "Container-level (containers[].securityContext)"
-        CN[runAsUser\nrunAsNonRoot\nreadOnlyRootFilesystem\nallowPrivilegeEscalation\ncapabilities\nprivileged\nseccompProfile]
+        CN[runAsUser runAsNonRoot readOnlyRootFilesystem allowPrivilegeEscalation capabilities privileged seccompProfile]
     end
     CN -->|overrides| PN
 ```

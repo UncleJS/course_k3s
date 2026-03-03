@@ -20,16 +20,16 @@ When a pod is misbehaving, work through these layers from the inside out:
 
 ```mermaid
 flowchart TD
-    Start([Pod is misbehaving]) --> D[kubectl describe pod\nCheck events and resource state]
-    D --> L[kubectl logs\nCheck stdout / stderr]
-    L --> Q1{Container\nhas a shell?}
-    Q1 -->|Yes| E[kubectl exec -it pod -- /bin/sh\nInspect filesystem, env, network]
-    Q1 -->|No - distroless| DBG[kubectl debug -it pod\n--image=busybox --target=app\nEphemeral container]
+    Start([Pod is misbehaving]) --> D[kubectl describe pod Check events and resource state]
+    D --> L[kubectl logs Check stdout / stderr]
+    L --> Q1{Container has a shell?}
+    Q1 -->|Yes| E[kubectl exec -it pod -- /bin/sh Inspect filesystem, env, network]
+    Q1 -->|No - distroless| DBG[kubectl debug -it pod --image=busybox --target=app Ephemeral container]
     E --> Q2{Still unclear?}
     DBG --> Q2
-    Q2 -->|Need HTTP access| PF[kubectl port-forward\nTest endpoints directly]
-    Q2 -->|Crash-looping| CP[kubectl debug pod\n--copy-to=debug-copy\nOverride command: sleep infinity]
-    Q2 -->|Node-level issue| N[kubectl debug node/\nPrivileged pod on the node]
+    Q2 -->|Need HTTP access| PF[kubectl port-forward Test endpoints directly]
+    Q2 -->|Crash-looping| CP[kubectl debug pod --copy-to=debug-copy Override command: sleep infinity]
+    Q2 -->|Node-level issue| N[kubectl debug node/ Privileged pod on the node]
     PF --> Fix([Apply fix])
     CP --> Fix
     N --> Fix

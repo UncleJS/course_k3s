@@ -32,10 +32,10 @@ When you run `podman run myimage`, Podman pulls and stores the image in your use
 
 ```mermaid
 flowchart LR
-    A[Containerfile] -->|buildah build\npodman build| B[Podman local store\n~/.local/share/containers]
-    B -->|podman push\ncosign sign| C[Remote Registry\nGHCR / DockerHub / Harbor]
-    C -->|imagePullPolicy| D[k3s containerd store\n/var/lib/rancher/k3s]
-    B -->|podman save\nctr import| D
+    A[Containerfile] -->|buildah build podman build| B[Podman local store ~/.local/share/containers]
+    B -->|podman push cosign sign| C[Remote Registry GHCR / DockerHub / Harbor]
+    C -->|imagePullPolicy| D[k3s containerd store /var/lib/rancher/k3s]
+    B -->|podman save ctr import| D
     E[trivy scan] -.->|gate on CRITICAL| C
     style B fill:#2d3748,color:#e2e8f0
     style D fill:#2d3748,color:#e2e8f0
@@ -173,11 +173,11 @@ buildah manifest push \
 
 ```mermaid
 graph TD
-    M["ghcr.io/myorg/taskr-web:2.1.0\n(manifest list)"]
-    M --> A["linux/amd64\nsha256:abc..."]
-    M --> B["linux/arm64\nsha256:def..."]
-    A --> NA[k3s on x86 server\npulls amd64 layer]
-    B --> NB[k3s on Raspberry Pi\npulls arm64 layer]
+    M["ghcr.io/myorg/taskr-web:2.1.0 (manifest list)"]
+    M --> A["linux/amd64 sha256:abc..."]
+    M --> B["linux/arm64 sha256:def..."]
+    A --> NA[k3s on x86 server pulls amd64 layer]
+    B --> NB[k3s on Raspberry Pi pulls arm64 layer]
 ```
 
 > **Cross-compilation without emulation:** `buildah build --platform linux/arm64` can build ARM images on an AMD64 host using QEMU binfmt emulation. Install `qemu-user-static` on the host to enable this.
@@ -589,10 +589,10 @@ sudo systemctl restart k3s-agent
 
 ```mermaid
 flowchart TD
-    A[kubectl set image deployment/web\nweb=ghcr.io/myorg/taskr-web:2.2.0] --> B[New ReplicaSet created]
+    A[kubectl set image deployment/web web=ghcr.io/myorg/taskr-web:2.2.0] --> B[New ReplicaSet created]
     B --> C{imagePullPolicy?}
     C -->|IfNotPresent| D{Is 2.2.0 in containerd?}
-    D -->|Yes — cached| E[Start immediately\nno pull needed]
+    D -->|Yes — cached| E[Start immediately no pull needed]
     D -->|No| F[Pull 2.2.0 from registry]
     F --> E
     C -->|Always| F
@@ -843,7 +843,7 @@ configs:
 
 ```mermaid
 flowchart TD
-    k3s[k3s node] -->|pull request| mirror[Harbor Mirror\nharbor.example.com]
+    k3s[k3s node] -->|pull request| mirror[Harbor Mirror harbor.example.com]
     mirror -->|cache hit| k3s
     mirror -->|cache miss → upstream| hub[docker.io / ghcr.io]
     hub --> mirror

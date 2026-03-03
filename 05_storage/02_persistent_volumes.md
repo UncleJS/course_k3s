@@ -24,11 +24,11 @@
 ```mermaid
 graph TB
     subgraph "Developer"
-        PVC[PersistentVolumeClaim\n"I need 10Gi ReadWriteOnce"]
+        PVC[PersistentVolumeClaim "I need 10Gi ReadWriteOnce"]
     end
     subgraph "Cluster Admin / Provisioner"
-        SC[StorageClass\n"local-path, longhorn, nfs"]
-        PV[PersistentVolume\n"10Gi on node-1 at /mnt/data"]
+        SC[StorageClass "local-path, longhorn, nfs"]
+        PV[PersistentVolume "10Gi on node-1 at /mnt/data"]
     end
     subgraph "Underlying Storage"
         DISK["Local disk / NFS / Block device"]
@@ -282,7 +282,7 @@ flowchart LR
         PV_S -->|"Binds"| BOUND_S[PVC: Bound]
     end
     subgraph "Dynamic Provisioning"
-        DEV_D[Dev creates PVC\nwith StorageClass]
+        DEV_D[Dev creates PVC with StorageClass]
         DEV_D --> SC_D[StorageClass]
         SC_D -->|"Calls provisioner"| PV_D[PV auto-created]
         PV_D -->|"Binds"| BOUND_D[PVC: Bound]

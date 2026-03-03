@@ -289,13 +289,13 @@ spec:
 ```mermaid
 graph TD
     subgraph Pattern 1 - Dedicated GPU Nodes
-        GN[worker-gpu\ntaint: dedicated=gpu:NoSchedule]
-        GP[GPU Pod\ntoleration: dedicated=gpu]
+        GN[worker-gpu taint: dedicated=gpu:NoSchedule]
+        GP[GPU Pod toleration: dedicated=gpu]
         GP --> GN
     end
     subgraph Pattern 2 - Zone HA
         Z1[zone-a node] & Z2[zone-b node] & Z3[zone-c node]
-        FP[Frontend Pod\nanti-affinity: spread across zones]
+        FP[Frontend Pod anti-affinity: spread across zones]
         FP --> Z1
         FP --> Z2
         FP --> Z3

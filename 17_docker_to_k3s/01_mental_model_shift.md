@@ -61,7 +61,7 @@ Docker requires a persistent background daemon (`dockerd`) running as root. Ever
 ```mermaid
 graph TD
     subgraph Docker
-        CLI[docker CLI] --> DAEMON[dockerd\nroot process]
+        CLI[docker CLI] --> DAEMON[dockerd root process]
         COMPOSE[docker-compose] --> DAEMON
         DAEMON --> OCI1[OCI container 1]
         DAEMON --> OCI2[OCI container 2]
@@ -71,7 +71,7 @@ graph TD
         KUBECTL[kubectl] --> APISERVER[kube-apiserver]
         APISERVER --> KUBELET[kubelet]
         KUBELET --> CRI[containerd CRI]
-        CRI --> RUNC[runc\nper-container]
+        CRI --> RUNC[runc per-container]
         CRI --> REGISTRY2[Registry pull]
     end
 ```
@@ -142,12 +142,12 @@ graph LR
         DRM[docker rm web]
     end
     subgraph kubectl
-        KA[kubectl run web --image=nginx\nkubectl apply -f deploy.yaml]
+        KA[kubectl run web --image=nginx kubectl apply -f deploy.yaml]
         KP[kubectl get pods]
         KL[kubectl logs pod/web-xxx]
         KE[kubectl exec -it pod/web-xxx -- sh]
         KS[kubectl scale deploy/web --replicas=0]
-        KRM[kubectl delete pod web-xxx\nor: kubectl delete deploy web]
+        KRM[kubectl delete pod web-xxx or: kubectl delete deploy web]
     end
     DR --> KA
     DP --> KP
@@ -261,7 +261,7 @@ graph TD
         SM --> SNET[Overlay network]
     end
     subgraph k3s
-        KS[k3s server\nAPI + etcd + scheduler] --> KA1[agent 1]
+        KS[k3s server API + etcd + scheduler] --> KA1[agent 1]
         KS --> KA2[agent 2]
         KS --> FLANNEL[Flannel VXLAN]
     end
@@ -282,8 +282,8 @@ Many Docker-based workflows mount the Docker socket (`/var/run/docker.sock`) int
 graph TD
     subgraph Dangerous["⚠️ Docker socket mount"]
         HOST[Host root] <-->|full access| SOCK[/var/run/docker.sock]
-        SOCK --> CONTAINER[Container with\n--volume /var/run/docker.sock:/var/run/docker.sock]
-        CONTAINER --> ESCAPE[Container escape\nRoot on host]
+        SOCK --> CONTAINER[Container with --volume /var/run/docker.sock:/var/run/docker.sock]
+        CONTAINER --> ESCAPE[Container escape Root on host]
     end
     subgraph K3sSafe["✅ k3s alternative"]
         BUILD[Kaniko / Buildah / img] --> REGISTRY[Push to registry]
@@ -346,15 +346,15 @@ Docker's BuildKit produces OCI images. k3s / containerd consumes OCI images. The
 ```mermaid
 flowchart LR
     subgraph BuildTools["Build (your CI machine)"]
-        DK[docker buildx build\n--cache-from / --cache-to]
-        PO[podman build\n--layers]
+        DK[docker buildx build --cache-from / --cache-to]
+        PO[podman build --layers]
         BA[buildah bake]
     end
     subgraph Registry
         GH[ghcr.io/myorg/taskr-web:2.1.0]
     end
     subgraph k3s
-        CT[containerd\npulls OCI image]
+        CT[containerd pulls OCI image]
     end
     BuildTools --> Registry --> k3s
 ```
@@ -454,8 +454,8 @@ flowchart LR
         D1[docker run nginx] --> D2[docker stop nginx] --> D3[docker rm nginx] --> D4[docker run nginx:1.26]
     end
     subgraph Declarative["Declarative (k8s)"]
-        K1[spec:\n  image: nginx:1.25] -->|change to| K2[spec:\n  image: nginx:1.26]
-        K2 -->|controller reconciles| K3[RollingUpdate\nold pod removed\nnew pod started]
+        K1[spec:   image: nginx:1.25] -->|change to| K2[spec:   image: nginx:1.26]
+        K2 -->|controller reconciles| K3[RollingUpdate old pod removed new pod started]
     end
 ```
 

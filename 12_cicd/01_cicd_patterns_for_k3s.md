@@ -31,21 +31,21 @@ flowchart LR
         A([Code Push]) --> B[Lint & Static Analysis]
         B --> C[Unit Tests]
         C --> D[Build Docker Image]
-        D --> E[Integration Tests\nin container]
-        E --> F[Push Image\nto Registry]
+        D --> E[Integration Tests in container]
+        E --> F[Push Image to Registry]
     end
 
     subgraph CD["Continuous Delivery"]
-        F --> G{Deployment\nModel}
-        G -->|Push| H[kubectl / helm\nin pipeline]
-        G -->|Pull GitOps| I[Update image tag\nin Git repo]
+        F --> G{Deployment Model}
+        G -->|Push| H[kubectl / helm in pipeline]
+        G -->|Pull GitOps| I[Update image tag in Git repo]
         H --> J[(k3s Cluster)]
         I --> K[(Git Repo)] --> L[GitOps Agent] --> J
     end
 
     subgraph Post["Post-Deploy"]
-        J --> M[Smoke Tests /\nHealth Checks]
-        M --> N[Notify Slack /\nGitHub Status]
+        J --> M[Smoke Tests / Health Checks]
+        M --> N[Notify Slack / GitHub Status]
     end
 
     style A fill:#22c55e,color:#fff
@@ -117,7 +117,8 @@ helm upgrade --install my-app ./charts/my-app \
   --namespace production \
   --set image.tag=$GIT_SHA \
   --set image.repository=ghcr.io/my-org/my-app \
-  --atomic \         # rollback automatically if deploy fails
+  # rollback automatically if deploy fails
+  --atomic \
   --timeout 3m \
   --wait
 ```

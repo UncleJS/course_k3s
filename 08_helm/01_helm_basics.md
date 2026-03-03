@@ -29,8 +29,8 @@ Helm is the package manager for Kubernetes. Instead of managing dozens of indivi
 
 ```mermaid
 graph LR
-    CR[Chart Repository\nhub.helm.sh\nartifacthub.io] -->|helm pull| LC[Local Chart]
-    LC -->|helm install| R[Release\nin Kubernetes]
+    CR[Chart Repository hub.helm.sh artifacthub.io] -->|helm pull| LC[Local Chart]
+    LC -->|helm install| R[Release in Kubernetes]
     R -->|helm upgrade| R
     R -->|helm rollback| R
     R -->|helm uninstall| D[Deleted]
@@ -304,9 +304,12 @@ ingress:
 ```bash
 helm install app chart/name \
   --set key=value \
-  --set a.b.c=value \          # nested: a.b.c
-  --set list[0]=a \            # list index
-  --set list={a,b,c} \         # whole list
+  # nested: a.b.c
+  --set a.b.c=value \
+  # list index
+  --set list[0]=a \
+  # whole list
+  --set list={a,b,c} \
   --set "key=value with spaces" # quoted values
 ```
 

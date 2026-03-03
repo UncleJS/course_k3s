@@ -396,11 +396,11 @@ Storing plaintext secrets in Git is a critical security risk. **Sealed Secrets**
 ```mermaid
 flowchart LR
     DEV[Developer] -->|kubeseal --cert| PLAIN[Plaintext Secret]
-    PLAIN -->|encrypted| SEALED[SealedSecret YAML\nsafe to commit to Git]
+    PLAIN -->|encrypted| SEALED[SealedSecret YAML safe to commit to Git]
     SEALED -->|git push| REPO[(Git Repo)]
     REPO -->|GitOps agent| CLUSTER[k3s Cluster]
     CLUSTER --> CTRL[sealed-secrets-controller]
-    CTRL -->|decrypt with private key| SECRET[Kubernetes Secret\nin cluster memory only]
+    CTRL -->|decrypt with private key| SECRET[Kubernetes Secret in cluster memory only]
 ```
 
 ### Install Sealed Secrets controller

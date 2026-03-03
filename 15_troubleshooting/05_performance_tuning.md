@@ -19,16 +19,16 @@ Performance problems in Kubernetes typically fall into four resource categories:
 
 ```mermaid
 graph TD
-    Symptom([Poor Performance\nor High Latency]) --> CPU{CPU Throttling?}
-    CPU -->|Yes| CPU_Fix[Increase CPU limits\nor scale out with HPA]
-    CPU -->|No| MEM{OOMKills or\nMemory Pressure?}
-    MEM -->|Yes| MEM_Fix[Increase memory limits\nor fix memory leak]
-    MEM -->|No| DISK{High disk I/O\nor IOPS saturation?}
-    DISK -->|Yes| DISK_Fix[Use faster storage\nor reduce write amplification]
-    DISK -->|No| NET{Network\nbandwidth / latency?}
-    NET -->|Yes| NET_Fix[Check CNI MTU\nor move pods closer]
-    NET -->|No| APP{Application-level\nbottleneck?}
-    APP -->|Yes| PROF[Profile with pprof\nor app profiler]
+    Symptom([Poor Performance or High Latency]) --> CPU{CPU Throttling?}
+    CPU -->|Yes| CPU_Fix[Increase CPU limits or scale out with HPA]
+    CPU -->|No| MEM{OOMKills or Memory Pressure?}
+    MEM -->|Yes| MEM_Fix[Increase memory limits or fix memory leak]
+    MEM -->|No| DISK{High disk I/O or IOPS saturation?}
+    DISK -->|Yes| DISK_Fix[Use faster storage or reduce write amplification]
+    DISK -->|No| NET{Network bandwidth / latency?}
+    NET -->|Yes| NET_Fix[Check CNI MTU or move pods closer]
+    NET -->|No| APP{Application-level bottleneck?}
+    APP -->|Yes| PROF[Profile with pprof or app profiler]
 
     style CPU_Fix fill:#d4edda,stroke:#28a745
     style MEM_Fix fill:#d4edda,stroke:#28a745

@@ -154,10 +154,10 @@ Each `service:` in Compose becomes a `Deployment` (stateless) or `StatefulSet` (
 ```mermaid
 graph LR
     subgraph Compose
-        CS[service: web\nimage: ...\nreplicas: 1]
+        CS[service: web image: ... replicas: 1]
     end
     subgraph Kubernetes
-        D[Deployment\nspec.replicas: 1] --> RS[ReplicaSet] --> P1[Pod] & P2[Pod]
+        D[Deployment spec.replicas: 1] --> RS[ReplicaSet] --> P1[Pod] & P2[Pod]
     end
     CS --> D
 ```
@@ -474,8 +474,8 @@ flowchart TD
     F -->|Yes| G[ConfigMap with envFrom]
     F -->|No| H[Inline env: in pod spec]
     C --> I{Production?}
-    I -->|Yes| J[SealedSecret or\nExternal Secrets Operator]
-    I -->|No / dev| K[Plain Secret\ndo not commit to git]
+    I -->|Yes| J[SealedSecret or External Secrets Operator]
+    I -->|No / dev| K[Plain Secret do not commit to git]
 ```
 
 > **SealedSecrets workflow (recommended for production):**
@@ -841,9 +841,9 @@ Compose `profiles:` and multiple compose files (`-f docker-compose.yml -f docker
 
 ```mermaid
 graph TD
-    BASE["base/\n  kustomization.yaml\n  deployment.yaml\n  service.yaml\n  configmap.yaml"]
-    DEV["overlays/dev/\n  kustomization.yaml\n  patch-replicas.yaml\n  secret-dev.yaml"]
-    PROD["overlays/prod/\n  kustomization.yaml\n  patch-replicas.yaml\n  patch-resources.yaml\n  secret-prod.yaml"]
+    BASE["base/   kustomization.yaml   deployment.yaml   service.yaml   configmap.yaml"]
+    DEV["overlays/dev/   kustomization.yaml   patch-replicas.yaml   secret-dev.yaml"]
+    PROD["overlays/prod/   kustomization.yaml   patch-replicas.yaml   patch-resources.yaml   secret-prod.yaml"]
 
     BASE --> DEV
     BASE --> PROD

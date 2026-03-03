@@ -29,14 +29,14 @@ Security is a process, not a destination. This lesson covers the layered approac
 ```mermaid
 graph TD
     subgraph "Defence in Depth"
-        L1[Layer 1: Image security\nScanned, minimal, non-root images]
-        L2[Layer 2: Pod security\nPSA Restricted, SecurityContext]
-        L3[Layer 3: Network security\nNetworkPolicies, TLS everywhere]
-        L4[Layer 4: RBAC\nLeast-privilege, no cluster-admin]
-        L5[Layer 5: Secrets security\nEncryption at rest, Sealed Secrets]
-        L6[Layer 6: Node OS security\nFirewall, SSH, minimal packages]
-        L7[Layer 7: k3s/API hardening\nCIS Benchmark, audit logging]
-        L8[Layer 8: Runtime detection\nFalco, anomaly detection]
+        L1[Layer 1: Image security Scanned, minimal, non-root images]
+        L2[Layer 2: Pod security PSA Restricted, SecurityContext]
+        L3[Layer 3: Network security NetworkPolicies, TLS everywhere]
+        L4[Layer 4: RBAC Least-privilege, no cluster-admin]
+        L5[Layer 5: Secrets security Encryption at rest, Sealed Secrets]
+        L6[Layer 6: Node OS security Firewall, SSH, minimal packages]
+        L7[Layer 7: k3s/API hardening CIS Benchmark, audit logging]
+        L8[Layer 8: Runtime detection Falco, anomaly detection]
 
         L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> L8
     end
@@ -99,10 +99,10 @@ k3s consolidates all components (API server, controller manager, scheduler, kube
 ```mermaid
 graph LR
     CONFIG["/etc/rancher/k3s/config.yaml"] --> K3S[k3s server binary]
-    K3S --> APISERVER[kube-apiserver\n--kube-apiserver-arg flags]
-    K3S --> CM[kube-controller-manager\n--kube-controller-manager-arg flags]
-    K3S --> SCH[kube-scheduler\n--kube-scheduler-arg flags]
-    K3S --> KL[kubelet\n--kubelet-arg flags]
+    K3S --> APISERVER[kube-apiserver --kube-apiserver-arg flags]
+    K3S --> CM[kube-controller-manager --kube-controller-manager-arg flags]
+    K3S --> SCH[kube-scheduler --kube-scheduler-arg flags]
+    K3S --> KL[kubelet --kubelet-arg flags]
 ```
 
 ### API Server Hardening
@@ -311,7 +311,7 @@ flowchart TD
         P5[":2379-2380 — etcd (HA multi-server only)"]
     end
 
-    INTERNET([internet]) -->|restrict to\ntrusted IPs| P1
+    INTERNET([internet]) -->|restrict to trusted IPs| P1
     NODES([other nodes]) --> P2
     NODES --> P3
     NODES --> P4
@@ -584,11 +584,11 @@ While Trivy scans images before deployment, Falco monitors running workloads for
 ```mermaid
 graph TD
     subgraph "Falco Architecture"
-        SC[Linux Kernel\nsyscall events] --> PROBE[Falco eBPF probe\nor kernel module]
-        PROBE --> FALCO[Falco engine\nrule evaluation]
+        SC[Linux Kernel syscall events] --> PROBE[Falco eBPF probe or kernel module]
+        PROBE --> FALCO[Falco engine rule evaluation]
         FALCO -->|alert| SYSLOG[syslog]
         FALCO -->|alert| STDOUT[stdout/JSON]
-        FALCO -->|alert| FALCOSIDEKICK[Falcosidekick\nwebhooks, Slack, PagerDuty...]
+        FALCO -->|alert| FALCOSIDEKICK[Falcosidekick webhooks, Slack, PagerDuty...]
     end
 ```
 

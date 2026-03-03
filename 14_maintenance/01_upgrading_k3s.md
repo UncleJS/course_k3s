@@ -181,11 +181,11 @@ kubectl get pods -n system-upgrade
 
 ```mermaid
 flowchart TD
-    Plan[Plan CR\n"upgrade k3s servers\nto v1.30.2+k3s1"] --> SUC[System Upgrade\nController]
-    SUC --> Q{Node matches\nPlan selector?}
-    Q -->|Yes| J[Create upgrade Job\nfor that node]
-    J --> Drain[Drain node\nif concurrency=1]
-    Drain --> Upgrade[Run upgrade container\nwith target version]
+    Plan[Plan CR "upgrade k3s servers to v1.30.2+k3s1"] --> SUC[System Upgrade Controller]
+    SUC --> Q{Node matches Plan selector?}
+    Q -->|Yes| J[Create upgrade Job for that node]
+    J --> Drain[Drain node if concurrency=1]
+    Drain --> Upgrade[Run upgrade container with target version]
     Upgrade --> Restart[Restart k3s service]
     Restart --> Uncordon[Uncordon node]
     Uncordon --> Next[Next node in queue]

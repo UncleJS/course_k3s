@@ -24,11 +24,11 @@
 ```mermaid
 flowchart TD
     EXT[External Client] --> NP[NodePort :3xxxx]
-    EXT --> LB[LoadBalancer\nKlipper IP]
+    EXT --> LB[LoadBalancer Klipper IP]
     INT[Internal Pod] --> CIP[ClusterIP]
     NP --> CIP
     LB --> CIP
-    CIP --> EP[Endpoints\nPod IPs]
+    CIP --> EP[Endpoints Pod IPs]
     EP --> P1[Pod 1] & P2[Pod 2] & P3[Pod 3]
 
     style CIP fill:#6366f1,color:#fff
@@ -123,8 +123,8 @@ k3s includes **Klipper**, a built-in service load balancer for bare-metal deploy
 
 ```mermaid
 flowchart LR
-    EXT[External Client] -->|"HTTP :80"| NODE["Node IP\n192.168.1.10"]
-    NODE --> KLIPPER[Klipper LB Pod\nDaemonSet]
+    EXT[External Client] -->|"HTTP :80"| NODE["Node IP 192.168.1.10"]
+    NODE --> KLIPPER[Klipper LB Pod DaemonSet]
     KLIPPER --> SVC[Service ClusterIP]
     SVC --> P1[Pod 1]
     SVC --> P2[Pod 2]

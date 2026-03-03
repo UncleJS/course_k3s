@@ -98,10 +98,10 @@ sequenceDiagram
     participant K8s as kubectl logs
 
     App->>CRI: writes to stdout / stderr
-    CRI->>Node: rotates log files\n/var/log/pods/<ns>/<pod>/<container>/0.log
+    CRI->>Node: rotates log files /var/log/pods/<ns>/<pod>/<container>/0.log
     K8s->>Node: reads log file
-    Note over Node: Log retained while pod exists\n+ rotation period (default: 10 files / 100Mi)
-    Note over Node: Deleted when pod is GC'd\nor node disk pressure triggers cleanup
+    Note over Node: Log retained while pod exists + rotation period (default: 10 files / 100Mi)
+    Note over Node: Deleted when pod is GC'd or node disk pressure triggers cleanup
 ```
 
 ### Log File Location on Node

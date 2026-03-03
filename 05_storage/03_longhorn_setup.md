@@ -33,8 +33,8 @@
 graph TB
     K8S[Kubernetes / k3s Workload]
     CSI[Longhorn CSI Driver]
-    LM[Longhorn Manager\nDaemonSet]
-    LE[Longhorn Engine\nper-volume]
+    LM[Longhorn Manager DaemonSet]
+    LE[Longhorn Engine per-volume]
 
     subgraph "Node 1"
         R1[(Replica 1)]
@@ -64,20 +64,20 @@ graph TB
 ```mermaid
 flowchart TD
     subgraph "Control Plane"
-        LMG[Longhorn Manager\nDaemonSet — all nodes]
-        LUI[Longhorn UI\nDeployment]
+        LMG[Longhorn Manager DaemonSet — all nodes]
+        LUI[Longhorn UI Deployment]
         LUI --> LMG
     end
 
     subgraph "Data Plane (per volume)"
-        ENG[Longhorn Engine\none per volume]
+        ENG[Longhorn Engine one per volume]
         ENG -->|"sync writes"| R1[(Replica on Node 1)]
         ENG -->|"sync writes"| R2[(Replica on Node 2)]
         ENG -->|"sync writes"| R3[(Replica on Node 3)]
     end
 
     subgraph "CSI Layer"
-        CSI[CSI Driver\nDaemonSet]
+        CSI[CSI Driver DaemonSet]
     end
 
     POD[Application Pod] --> CSI
@@ -259,7 +259,7 @@ flowchart TD
     ENG -->|"synchronous replica"| R3[(Replica: Node 3)]
 
     R1 -->|"Node 1 fails!"| FAIL((💥))
-    FAIL --> REBUILD[Engine rebuilds replica\non Node 4]
+    FAIL --> REBUILD[Engine rebuilds replica on Node 4]
     REBUILD --> R4[(Replica: Node 4)]
 
     style FAIL fill:#fee2e2
@@ -355,8 +355,8 @@ kubectl logs -n longhorn-system -l app=longhorn-manager --tail=50
 flowchart TD
     A[Check Longhorn release notes] --> B[Upgrade Longhorn Manager]
     B --> C[Wait for all volumes to become healthy]
-    C --> D[Upgrade Longhorn Engine\nfor each volume]
-    D --> E[Verify application pods\nstill functioning]
+    C --> D[Upgrade Longhorn Engine for each volume]
+    D --> E[Verify application pods still functioning]
     E --> DONE([Upgrade complete])
 
     style DONE fill:#22c55e,color:#fff

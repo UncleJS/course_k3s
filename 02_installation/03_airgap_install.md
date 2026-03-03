@@ -50,9 +50,9 @@ flowchart TD
     end
 
     subgraph "Air-Gapped Host (no internet)"
-        TRANSFER --> LOAD[Load container images\ninto containerd]
-        LOAD --> INSTALL[Run install.sh\nwith SKIP_DOWNLOAD=true]
-        INSTALL --> START[k3s starts using\npre-loaded images]
+        TRANSFER --> LOAD[Load container images into containerd]
+        LOAD --> INSTALL[Run install.sh with SKIP_DOWNLOAD=true]
+        INSTALL --> START[k3s starts using pre-loaded images]
         START --> VERIFY[Verify cluster]
     end
 
@@ -186,13 +186,13 @@ sudo INSTALL_K3S_SKIP_DOWNLOAD=true \
 
 ```mermaid
 flowchart TD
-    SKIP{"INSTALL_K3S_SKIP_DOWNLOAD\n= true?"}
+    SKIP{"INSTALL_K3S_SKIP_DOWNLOAD = true?"}
     SKIP -->|Yes| USE[Use existing /usr/local/bin/k3s binary]
     SKIP -->|No| DL[Download k3s binary from GitHub]
     USE --> SYSTEMD[Create systemd service]
     DL --> SYSTEMD
     SYSTEMD --> START[Start k3s]
-    START --> IMG[containerd imports images\nfrom agent/images/ dir]
+    START --> IMG[containerd imports images from agent/images/ dir]
     IMG --> READY([Cluster ready — no internet needed])
 
     style READY fill:#22c55e,color:#fff
@@ -275,15 +275,15 @@ sudo systemctl restart k3s
 
 ```mermaid
 flowchart TD
-    A[New k3s version released] --> B[Download new binary\n+ airgap images tarball\non online machine]
+    A[New k3s version released] --> B[Download new binary + airgap images tarball on online machine]
     B --> C[Transfer to air-gapped host]
-    C --> D[Replace image tarball in\n/var/lib/rancher/k3s/agent/images/]
+    C --> D[Replace image tarball in /var/lib/rancher/k3s/agent/images/]
     D --> E[Stop k3s service]
     E --> F[Replace /usr/local/bin/k3s binary]
     F --> G[Start k3s service]
     G --> H{Check nodes Ready}
     H -->|Yes| DONE([Update complete!])
-    H -->|No| LOGS[Check logs:\njournalctl -u k3s -f]
+    H -->|No| LOGS[Check logs: journalctl -u k3s -f]
 
     style DONE fill:#22c55e,color:#fff
     style LOGS fill:#fee2e2,color:#000

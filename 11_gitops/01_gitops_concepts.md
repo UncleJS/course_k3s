@@ -31,17 +31,17 @@ GitOps was coined by Weaveworks in 2017 and has since become a CNCF-recognized p
 ```mermaid
 flowchart LR
     subgraph Developer["Developer Workflow"]
-        D[Developer] -->|git commit + push| REPO[(Git Repository\ngithub.com/org/infra)]
+        D[Developer] -->|git commit + push| REPO[(Git Repository github.com/org/infra)]
     end
 
     subgraph Cluster["k3s Cluster"]
-        RC[Reconciler\nFlux / ArgoCD] -->|git pull / watch| REPO
+        RC[Reconciler Flux / ArgoCD] -->|git pull / watch| REPO
         RC -->|compare desired vs actual| STATE[Cluster State]
         RC -->|kubectl apply / helm upgrade| STATE
     end
 
     subgraph Audit["Audit Trail"]
-        REPO -->|git log| LOG[Full change history\nwho, what, when, why]
+        REPO -->|git log| LOG[Full change history who, what, when, why]
     end
 
     style REPO fill:#f59e0b,color:#000
@@ -97,17 +97,17 @@ Software agents **continuously observe** the actual cluster state and attempt to
 flowchart TD
     subgraph Push["Push Model (Traditional CD)"]
         direction LR
-        DEV1[Developer\npushes code] --> CI1[CI Pipeline\nbuilds image]
-        CI1 --> PUSH[Pipeline\nkubectl apply / helm upgrade]
+        DEV1[Developer pushes code] --> CI1[CI Pipeline builds image]
+        CI1 --> PUSH[Pipeline kubectl apply / helm upgrade]
         PUSH -->|direct write| K8S1[Kubernetes Cluster]
-        K8S1 -.->|requires outbound network\naccess from CI to cluster| PUSH
+        K8S1 -.->|requires outbound network access from CI to cluster| PUSH
     end
 
     subgraph Pull["Pull Model (GitOps)"]
         direction LR
-        DEV2[Developer\npushes code] --> CI2[CI Pipeline\nbuilds + pushes image\nupdates image tag in Git]
+        DEV2[Developer pushes code] --> CI2[CI Pipeline builds + pushes image updates image tag in Git]
         CI2 -->|commits to| REPO[(Git Repo)]
-        AGENT[GitOps Agent\ninside cluster] -->|watches| REPO
+        AGENT[GitOps Agent inside cluster] -->|watches| REPO
         AGENT -->|pulls + applies| K8S2[Kubernetes Cluster]
     end
 
@@ -134,14 +134,14 @@ The reconciler runs a continuous control loop:
 
 ```mermaid
 flowchart TD
-    START([Start]) --> FETCH[Fetch desired state\nfrom Git]
-    FETCH --> OBSERVE[Observe actual state\nfrom Kubernetes API]
-    OBSERVE --> DIFF{Drift\ndetected?}
-    DIFF -->|No drift| SLEEP[Wait for interval\nor Git change event]
+    START([Start]) --> FETCH[Fetch desired state from Git]
+    FETCH --> OBSERVE[Observe actual state from Kubernetes API]
+    OBSERVE --> DIFF{Drift detected?}
+    DIFF -->|No drift| SLEEP[Wait for interval or Git change event]
     SLEEP --> FETCH
-    DIFF -->|Drift found| APPLY[Apply diff\nkubectl apply / helm upgrade]
-    APPLY --> VERIFY[Verify health\ncheck rollout status]
-    VERIFY --> NOTIFY[Notify\nalert if unhealthy]
+    DIFF -->|Drift found| APPLY[Apply diff kubectl apply / helm upgrade]
+    APPLY --> VERIFY[Verify health check rollout status]
+    VERIFY --> NOTIFY[Notify alert if unhealthy]
     NOTIFY --> SLEEP
 ```
 
@@ -168,17 +168,17 @@ Both Flux and ArgoCD support configurable reconciliation intervals:
 flowchart LR
     subgraph Traditional["Traditional CI/CD"]
         T1[Code commit] --> T2[CI: build + test]
-        T2 --> T3[CD: kubectl apply\nfrom pipeline]
+        T2 --> T3[CD: kubectl apply from pipeline]
         T3 --> T4[Cluster]
         T5[Config change] -->|direct kubectl| T4
         T6[Manual hotfix] -->|kubectl edit| T4
     end
 
     subgraph GitOps["GitOps CI/CD"]
-        G1[Code commit] --> G2[CI: build + test\npush image]
-        G2 --> G3[CI: update image tag\nin Git repo]
-        G3 --> G4[(Git Repo\nSingle Source of Truth)]
-        G4 --> G5[GitOps Agent\nreconciles]
+        G1[Code commit] --> G2[CI: build + test push image]
+        G2 --> G3[CI: update image tag in Git repo]
+        G3 --> G4[(Git Repo Single Source of Truth)]
+        G4 --> G5[GitOps Agent reconciles]
         G5 --> G6[Cluster]
     end
 ```

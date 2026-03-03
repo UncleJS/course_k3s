@@ -28,7 +28,7 @@ While embedded etcd is the recommended HA path for most users, k3s also supports
 
 ```mermaid
 flowchart TD
-    A{Do you have an existing\nmanaged DB with SLAs?} -->|Yes| B[External Datastore]
+    A{Do you have an existing managed DB with SLAs?} -->|Yes| B[External Datastore]
     A -->|No| C{Need HA?}
     C -->|Yes| D[Embedded etcd HA]
     C -->|No| E[SQLite single-node]

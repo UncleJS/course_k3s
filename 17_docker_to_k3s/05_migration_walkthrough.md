@@ -47,12 +47,12 @@ This lesson walks through a complete, realistic migration from a Docker-based wo
 
 ```mermaid
 flowchart LR
-    P1[Phase 1\nAssess] --> P2[Phase 2\nBuild & Push]
-    P2 --> P3[Phase 3\nWrite Manifests]
-    P3 --> P4[Phase 4\nStaging Test]
-    P4 --> P5[Phase 5\nData Migration]
-    P5 --> P6[Phase 6\nCutover]
-    P6 --> P7[Phase 7\nValidate]
+    P1[Phase 1 Assess] --> P2[Phase 2 Build & Push]
+    P2 --> P3[Phase 3 Write Manifests]
+    P3 --> P4[Phase 4 Staging Test]
+    P4 --> P5[Phase 5 Data Migration]
+    P5 --> P6[Phase 6 Cutover]
+    P6 --> P7[Phase 7 Validate]
     P6 -.->|if issues| RB[Rollback]
     RB -.-> P1
 
@@ -188,7 +188,7 @@ ls ./k8s-generated/
 
 ```mermaid
 flowchart TD
-    A[docker-compose.yml] -->|kompose convert| B[Generated manifests\n./k8s-generated/]
+    A[docker-compose.yml] -->|kompose convert| B[Generated manifests ./k8s-generated/]
     B --> C{Review each file}
     C -->|Service name, port| D[✅ Keep as-is]
     C -->|PVC storageClass| E[⚠️ Change to local-path]
@@ -912,11 +912,11 @@ This is the most Docker-specific phase. Docker named volumes are stored in `/var
 
 ```mermaid
 flowchart TD
-    A[Docker named volume\n/var/lib/docker/volumes/taskr_pgdata/_data] -->|pg_dump| B[SQL dump file\n/tmp/taskr-dump.sql]
+    A[Docker named volume /var/lib/docker/volumes/taskr_pgdata/_data] -->|pg_dump| B[SQL dump file /tmp/taskr-dump.sql]
     B -->|kubectl cp| C[Postgres Pod in k3s]
-    C -->|psql restore| D[k3s PVC\n/var/lib/rancher/k3s/storage/...]
+    C -->|psql restore| D[k3s PVC /var/lib/rancher/k3s/storage/...]
     
-    E[Docker named volume\ntaskr_redis_data] -->|redis-cli BGSAVE| F[dump.rdb file]
+    E[Docker named volume taskr_redis_data] -->|redis-cli BGSAVE| F[dump.rdb file]
     F -->|kubectl cp| G[Redis Pod in k3s]
     G -->|restore from RDB| H[k3s Redis PVC]
 
@@ -1021,8 +1021,8 @@ Before cutting over DNS fully, run a canary: send a small percentage of traffic 
 
 ```mermaid
 flowchart LR
-    LB[Load Balancer\nor DNS weighted] -->|90%| A[Docker stack\ntaskr.example.com]
-    LB -->|10%| B[k3s Ingress\ntaskr-canary.example.com]
+    LB[Load Balancer or DNS weighted] -->|90%| A[Docker stack taskr.example.com]
+    LB -->|10%| B[k3s Ingress taskr-canary.example.com]
     B --> C[k3s Pods]
     A --> D[Docker Containers]
 
@@ -1170,13 +1170,13 @@ If you are migrating from **Docker Swarm** (not just Compose), the mapping is mo
 ```mermaid
 flowchart LR
     subgraph Docker Swarm
-        S1[Service\nreplicas=3] --> S2[Task\nContainer]
+        S1[Service replicas=3] --> S2[Task Container]
         S3[Stack] --> S1
         S4[Overlay network] --- S1
         S5[Swarm secret] -.-> S1
     end
     subgraph k3s
-        K1[Deployment\nreplicas: 3] --> K2[Pod\nContainer]
+        K1[Deployment replicas: 3] --> K2[Pod Container]
         K3[Namespace] --> K1
         K4[NetworkPolicy] --- K1
         K5[Secret] -.-> K1
@@ -1293,12 +1293,12 @@ kubectl scale deployment taskr-web --replicas=0 -n taskr
 ```mermaid
 flowchart TD
     A[Issue detected post-cutover] --> B{Severity?}
-    B -->|Minor — logs/metrics| C[Monitor 15 min\ncheck again]
+    B -->|Minor — logs/metrics| C[Monitor 15 min check again]
     B -->|Major — errors > 5%| D[Scale k3s web to 0]
     D --> E[Start Docker stack]
     E --> F[Revert DNS]
     F --> G[Notify team]
-    G --> H[Post-mortem\nfix issue\nre-attempt migration]
+    G --> H[Post-mortem fix issue re-attempt migration]
     style D fill:#7c2d12,color:#fed7aa
     style E fill:#1a365d,color:#e2e8f0
 ```

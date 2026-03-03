@@ -26,9 +26,9 @@ k3s can be configured in three ways, applied in this order of precedence:
 
 ```mermaid
 flowchart LR
-    A["CLI Flags\n(highest priority)"] --> MERGE[Merged config]
-    B["Environment Variables\n(medium priority)"] --> MERGE
-    C["/etc/rancher/k3s/config.yaml\n(lowest priority)"] --> MERGE
+    A["CLI Flags (highest priority)"] --> MERGE[Merged config]
+    B["Environment Variables (medium priority)"] --> MERGE
+    C["/etc/rancher/k3s/config.yaml (lowest priority)"] --> MERGE
     MERGE --> K3S[k3s server/agent]
 
     style A fill:#6366f1,color:#fff

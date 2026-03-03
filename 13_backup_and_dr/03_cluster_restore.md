@@ -35,25 +35,25 @@ Understanding the scenario determines which recovery tool to use and how long re
 
 ```mermaid
 flowchart TD
-    START([Disaster detected]) --> Q1{Entire cluster\nstate lost?}
+    START([Disaster detected]) --> Q1{Entire cluster state lost?}
 
-    Q1 -->|Yes| Q2{etcd snapshot\navailable?}
-    Q1 -->|No| Q3{Individual\nresources deleted?}
+    Q1 -->|Yes| Q2{etcd snapshot available?}
+    Q1 -->|No| Q3{Individual resources deleted?}
 
-    Q2 -->|Yes| R1[Restore from\netcd snapshot]
-    Q2 -->|No| Q4{Velero backup\navailable?}
+    Q2 -->|Yes| R1[Restore from etcd snapshot]
+    Q2 -->|No| Q4{Velero backup available?}
 
-    Q4 -->|Yes| R2[Restore full cluster\nwith Velero]
-    Q4 -->|No| R3[Rebuild from\nIaC / GitOps]
+    Q4 -->|Yes| R2[Restore full cluster with Velero]
+    Q4 -->|No| R3[Rebuild from IaC / GitOps]
 
-    Q3 -->|Yes| Q5{Need PVC\ndata too?}
-    Q3 -->|No| Q6{Node\nnot Ready?}
+    Q3 -->|Yes| Q5{Need PVC data too?}
+    Q3 -->|No| Q6{Node not Ready?}
 
-    Q5 -->|Yes| R4[Velero restore\nwith Kopia/Restic]
-    Q5 -->|No| R5[Velero partial\nrestore — resources only]
+    Q5 -->|Yes| R4[Velero restore with Kopia/Restic]
+    Q5 -->|No| R5[Velero partial restore — resources only]
 
-    Q6 -->|Yes| Q7{Other nodes\nhealthy?}
-    Q7 -->|Yes - HA| R6[Remove node,\ndrain & replace]
+    Q6 -->|Yes| Q7{Other nodes healthy?}
+    Q7 -->|Yes - HA| R6[Remove node, drain & replace]
     Q7 -->|No - single node| R1
 
     style R1 fill:#d4edda,stroke:#28a745
@@ -371,11 +371,11 @@ quarterly to ensure your restore procedures are current and your team has muscle
 
 ```mermaid
 flowchart LR
-    P([Plan drill]) --> E[Spin up\ntest cluster]
-    E --> R[Restore from\nproduction backup]
-    R --> V[Verify all\napplications]
-    V --> M[Measure RTO\nactual vs target]
-    M --> D[Document gaps\n& improvements]
+    P([Plan drill]) --> E[Spin up test cluster]
+    E --> R[Restore from production backup]
+    R --> V[Verify all applications]
+    V --> M[Measure RTO actual vs target]
+    M --> D[Document gaps & improvements]
     D --> U[Update runbook]
 ```
 

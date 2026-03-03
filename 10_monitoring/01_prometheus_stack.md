@@ -33,15 +33,15 @@ flowchart TD
         direction TB
 
         subgraph Targets["Scrape Targets"]
-            NE[node-exporter\nper node]
+            NE[node-exporter per node]
             KSM[kube-state-metrics]
-            API[kube-apiserver\n:6443/metrics]
-            APP[Your App\n/metrics]
-            CM[controller-manager\n/metrics]
+            API[kube-apiserver :6443/metrics]
+            APP[Your App /metrics]
+            CM[controller-manager /metrics]
         end
 
         subgraph Stack["kube-prometheus-stack"]
-            PROM[Prometheus\nTSDB + Scrape Engine]
+            PROM[Prometheus TSDB + Scrape Engine]
             AM[Alertmanager]
             GF[Grafana]
         end
@@ -63,7 +63,7 @@ flowchart TD
     subgraph External["External"]
         SLACK[Slack]
         EMAIL[Email / PagerDuty]
-        USER[Ops Team\nbrowser]
+        USER[Ops Team browser]
     end
 
     AM --> SLACK

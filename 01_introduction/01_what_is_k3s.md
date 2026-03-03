@@ -58,7 +58,7 @@ graph LR
         CR[containerd]
     end
     subgraph "k3s (1 binary)"
-        K3S["k3s binary\n─────────────\netcd (embedded)\nkube-apiserver\ncontroller-manager\nkube-scheduler\nkube-proxy\nkubelet\ncontainerd\nFlannel CNI\nTraefik Ingress\nCoreDNS\nKlipper LB\nlocal-path provisioner"]
+        K3S["k3s binary ───────────── etcd (embedded) kube-apiserver controller-manager kube-scheduler kube-proxy kubelet containerd Flannel CNI Traefik Ingress CoreDNS Klipper LB local-path provisioner"]
     end
     style K3S fill:#22c55e,color:#fff,font-size:12px
 ```
@@ -154,18 +154,18 @@ Understanding how k3s packages everything into one binary helps you reason about
 ```mermaid
 flowchart TD
     BIN["k3s binary"]
-    BIN --> SERVER["k3s server mode\n(runs control plane + agent)"]
-    BIN --> AGENT["k3s agent mode\n(runs node agent only)"]
-    BIN --> KUBECTL["k3s kubectl\n(built-in kubectl)"]
-    BIN --> CRICTL["k3s crictl\n(CRI debugging tool)"]
-    BIN --> CTR["k3s ctr\n(containerd client)"]
-    BIN --> ETCD["k3s etcd-snapshot\n(backup/restore)"]
-    BIN --> CERT["k3s certificate\n(cert management)"]
-    BIN --> TOKEN["k3s token\n(node join tokens)"]
+    BIN --> SERVER["k3s server mode (runs control plane + agent)"]
+    BIN --> AGENT["k3s agent mode (runs node agent only)"]
+    BIN --> KUBECTL["k3s kubectl (built-in kubectl)"]
+    BIN --> CRICTL["k3s crictl (CRI debugging tool)"]
+    BIN --> CTR["k3s ctr (containerd client)"]
+    BIN --> ETCD["k3s etcd-snapshot (backup/restore)"]
+    BIN --> CERT["k3s certificate (cert management)"]
+    BIN --> TOKEN["k3s token (node join tokens)"]
 
-    SERVER --> CP["Control Plane\nkube-apiserver\nkube-scheduler\ncontroller-manager"]
-    SERVER --> DS["Datastore\nSQLite (default)\nor etcd (HA)"]
-    SERVER --> AGENT2["Embedded Agent\nkubelet\nkube-proxy\ncontainerd\nFlannel"]
+    SERVER --> CP["Control Plane kube-apiserver kube-scheduler controller-manager"]
+    SERVER --> DS["Datastore SQLite (default) or etcd (HA)"]
+    SERVER --> AGENT2["Embedded Agent kubelet kube-proxy containerd Flannel"]
 
     style BIN fill:#6366f1,color:#fff
     style SERVER fill:#22c55e,color:#fff
