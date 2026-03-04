@@ -348,7 +348,7 @@ flowchart TD
 | 02 | [Install Rancher on k3s (Helm)](18_rancher/02_install_rancher_on_k3s.md) |
 | 03 | [Import Existing Clusters](18_rancher/03_import_existing_clusters.md) |
 | 04 | [Fleet Basics](18_rancher/04_fleet_basics.md) |
-| Labs | [rancher-values.yaml](18_rancher/labs/rancher-values.yaml) · [fleet-gitrepo.yaml](18_rancher/labs/fleet-gitrepo.yaml) |
+| Labs | [install-rancher.sh](18_rancher/labs/install-rancher.sh) · [uninstall-rancher.sh](18_rancher/labs/uninstall-rancher.sh) · [rancher-values.yaml](18_rancher/labs/rancher-values.yaml) · [fleet-gitrepo.yaml](18_rancher/labs/fleet-gitrepo.yaml) |
 
 ---
 

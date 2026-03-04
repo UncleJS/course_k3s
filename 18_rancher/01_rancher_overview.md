@@ -7,6 +7,7 @@
 - [High-Level Architecture](#high-level-architecture)
 - [Key Concepts](#key-concepts)
 - [When to Use Rancher (and When Not To)](#when-to-use-rancher-and-when-not-to)
+- [Lab Files](#lab-files)
 
 ---
 
@@ -91,6 +92,21 @@ Use Rancher when:
 Skip Rancher (for now) when:
 - You have a single small cluster and prefer `kubectl` + one GitOps tool.
 - You do not want an additional platform component to maintain.
+
+---
+
+## Lab Files
+
+The `18_rancher/labs/` directory contains all scripts and configuration used across this module:
+
+| File | Purpose |
+|---|---|
+| [install-rancher.sh](labs/install-rancher.sh) | Automated Rancher install — runs preflight checks, optionally installs cert-manager, deploys Rancher via Helm, waits for rollout, and prints a post-install summary. Supports all three TLS modes and `--dry-run`. See Lesson 02 for full usage. |
+| [uninstall-rancher.sh](labs/uninstall-rancher.sh) | Full Rancher teardown — removes the Helm release, `cattle-system` namespace, lingering `cattle-*`/`fleet-*` namespaces, Rancher CRDs, and optionally cert-manager. Includes a post-uninstall audit pass. |
+| [rancher-values.yaml](labs/rancher-values.yaml) | Reference Helm values file showing hostname, TLS source, replica count, and the commented-out Let's Encrypt configuration block. The install script passes these values via `--set` flags; this file is useful for understanding the available knobs or for running `helm upgrade` manually. |
+| [fleet-gitrepo.yaml](labs/fleet-gitrepo.yaml) | Example Fleet `GitRepo` custom resource that points Fleet at a Git repository and path to deploy to one or more managed clusters. Edit the `repo` and `paths` fields before applying. See Lesson 04 for full usage. |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 
