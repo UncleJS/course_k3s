@@ -1,6 +1,10 @@
 # Install Rancher on k3s (Helm)
 > Module 18 · Lesson 02 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Prerequisites](#prerequisites)
 - [Choose a Hostname and TLS Strategy](#choose-a-hostname-and-tls-strategy)
@@ -323,6 +327,9 @@ sudo ./uninstall-rancher.sh --force
 - **Certificate pending**: check `cert-manager` pods and `Certificate`/`Challenge` objects.
 - **PodSecurity issues**: ensure the management cluster policy allows Rancher workloads.
 - **Strict agent TLS + private CA**: if using a private CA, set `privateCA: true` and ensure agents trust the CA.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

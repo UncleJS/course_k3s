@@ -1,6 +1,10 @@
 # Glossary
 > [↑ Course Index](README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](LICENSE.md)
+
 A reference dictionary of terms used throughout this course, covering Kubernetes/k3s core concepts, k3s-specific components, and the wider ecosystem tooling.
 
 ## Table of Contents
@@ -25,12 +29,18 @@ A key-value pair attached to a Kubernetes object (in `metadata.annotations`) tha
 **ArgoCD**
 A declarative GitOps continuous delivery tool for Kubernetes. ArgoCD watches Git repositories and synchronises the cluster state to match the desired state defined in Git. See [Module 11 – GitOps](11_gitops/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## B
 
 **Buildah**
 A rootless, daemonless OCI image build tool that integrates tightly with Podman. Buildah can build images from Containerfiles or via scripted layer manipulation. See [Module 16 – Images and Registries](16_podman_to_k3s/03_images_and_registries.md).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -72,6 +82,9 @@ The low-level containerd CLI. k3s wraps it as `k3s ctr` to ensure commands run i
 **CustomResourceDefinition (CRD)**
 A Kubernetes extension mechanism that allows users to define new API types (custom resources). Helm, Flux, ArgoCD, cert-manager, Traefik, and Longhorn all install their own CRDs. See [Module 08 – Helm](08_helm/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## D
@@ -82,12 +95,18 @@ A Kubernetes workload object that ensures one pod runs on every (or a subset of)
 **Deployment**
 The most common Kubernetes workload object. Manages a set of identical, stateless pods with rolling updates, rollback capability, and desired-replica enforcement via a *ReplicaSet*. See [Module 03 – First Steps](03_first_steps/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## E
 
 **etcd**
 A distributed key-value store used by Kubernetes as its backing state store. Full Kubernetes uses etcd in a cluster. k3s replaces etcd with *SQLite* (default for single-node) or supports embedded etcd for HA multi-node setups. See [Module 06 – Multi-Node Clusters](06_multi_node_cluster/).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -102,12 +121,18 @@ A set of GitOps controllers for Kubernetes (part of the CNCF). Flux watches Git 
 **Fleet**
 A GitOps engine from Rancher designed for multi-cluster continuous delivery. Fleet watches Git repositories and deploys content as bundles across one or many clusters, with rich targeting and drift reconciliation. See [Module 18 – Rancher](18_rancher/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## G
 
 **Grafana**
 An open-source dashboarding and visualisation platform. In k3s monitoring stacks, Grafana is deployed alongside Prometheus to render metrics as graphs and dashboards. See [Module 10 – Monitoring](10_monitoring/).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -125,6 +150,9 @@ A k3s CRD for supplying override `values.yaml` content to a `HelmChart` object. 
 **HorizontalPodAutoscaler (HPA)**
 A Kubernetes controller that automatically scales the number of pod replicas in a Deployment or StatefulSet based on CPU utilisation, memory, or custom metrics. See [Module 10 – Monitoring](10_monitoring/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## I
@@ -138,12 +166,18 @@ A Kubernetes API object that defines HTTP(S) routing rules from external traffic
 **IngressRoute** *(Traefik CRD)*
 A Traefik-specific CRD that extends standard Kubernetes Ingress with additional features: TCP/UDP routing, middleware chains, and TLS configuration. k3s's built-in Traefik uses IngressRoutes. See [Module 07 – Ingress and TLS](07_ingress_and_tls/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## J
 
 **Job**
 A Kubernetes workload object that runs one or more pods to completion (rather than indefinitely). Used for batch processing, database migrations, and one-off tasks. Contrast with *Deployment*; see also *CronJob*.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -167,6 +201,9 @@ A network proxy that runs on each node and maintains network rules for Service r
 **Kustomize**
 A Kubernetes-native configuration management tool. Kustomize overlays allow you to customise base manifests for different environments (dev/staging/prod) without templating. Built into `kubectl` as `kubectl apply -k`. See [Module 11 – GitOps](11_gitops/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## L
@@ -186,6 +223,9 @@ A simple dynamic storage provisioner bundled with k3s. Creates `PersistentVolume
 **Longhorn**
 A cloud-native distributed block storage system for Kubernetes. Longhorn replicates volumes across nodes, provides snapshots and backups, and is a recommended persistent storage solution for production k3s clusters. See [Module 05 – Storage](05_storage/) and [Module 13 – Backup and DR](13_backup_and_dr/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## M
@@ -198,6 +238,9 @@ A bare-metal LoadBalancer implementation for Kubernetes. MetalLB assigns real IP
 
 **Middleware** *(Traefik CRD)*
 A Traefik CRD that defines request/response transformations applied to matched routes — e.g., rate limiting, authentication, header injection, redirect rules. See [Module 07 – Ingress and TLS](07_ingress_and_tls/).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -215,12 +258,18 @@ A physical or virtual machine in the cluster. In k3s terminology: *server nodes*
 **NodePort**
 A Kubernetes Service type that exposes a Service on a static port (30000–32767) on every node's IP address. Useful for development and simple external access without a load balancer.
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## O
 
 **OCI (Open Container Initiative)**
 An open industry standard for container image formats and runtimes. All modern container tools (Podman, Docker, containerd, buildah) produce OCI-compatible images.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -244,6 +293,9 @@ A mechanism for kubelet to assess pod health. Kubernetes supports three probe ty
 **Prometheus**
 An open-source time-series metrics database and monitoring system. The standard monitoring backend for Kubernetes clusters. Scrapes metrics from pods via `/metrics` endpoints. See [Module 10 – Monitoring](10_monitoring/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## R
@@ -262,6 +314,9 @@ The k3s configuration file at `/etc/rancher/k3s/registries.yaml` that defines re
 
 **Resource Quota**
 A Kubernetes object that limits the total resources (CPU, memory, object counts) consumable within a namespace. Used to enforce fair-use policies in multi-tenant clusters. See [Module 09 – Security](09_security/).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -291,6 +346,9 @@ A Kubernetes workload object for stateful applications (databases, message queue
 **StorageClass**
 A Kubernetes object that defines a "class" of storage with a specific provisioner and parameters. Pods claim storage by referencing a StorageClass in their PVC. k3s ships with `local-path` as the default StorageClass. See [Module 05 – Storage](05_storage/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## T
@@ -301,6 +359,9 @@ A mechanism to control pod scheduling. A *taint* on a node repels pods; a *toler
 **Traefik**
 A modern reverse proxy and Ingress controller bundled with k3s. Traefik integrates with cert-manager for automatic TLS, supports TCP/UDP routing, and provides a dashboard UI. k3s deploys Traefik automatically via a `HelmChart` CRD. See [Module 07 – Ingress and TLS](07_ingress_and_tls/).
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## V
@@ -310,6 +371,9 @@ An open-source tool for backing up and restoring Kubernetes cluster resources an
 
 **Volume**
 A directory accessible to containers in a pod. Kubernetes supports many volume types: `emptyDir`, `configMap`, `secret`, `persistentVolumeClaim`, `hostPath`, and CSI volumes. Volumes outlive individual containers but not necessarily the pod. See [Module 05 – Storage](05_storage/).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 

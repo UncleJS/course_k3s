@@ -1,6 +1,10 @@
 # Performance Tuning
 > Module 15 · Lesson 05 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 1. [Identifying Bottlenecks](#identifying-bottlenecks)
 2. [kubectl top — Resource Usage](#kubectl-top--resource-usage)

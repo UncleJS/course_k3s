@@ -1,6 +1,10 @@
 # Fleet Basics (Rancher GitOps)
 > Module 18 · Lesson 04 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [How Fleet Fits with Module 11](#how-fleet-fits-with-module-11)
@@ -72,6 +76,9 @@ kubectl apply -f 18_rancher/labs/fleet-gitrepo.yaml
 kubectl get gitrepo -A
 kubectl describe gitrepo -n fleet-local my-repo
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

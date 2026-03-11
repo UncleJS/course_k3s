@@ -1,6 +1,10 @@
 # Velero Backup
 > Module 13 · Lesson 02 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 1. [Velero Overview](#velero-overview)
 2. [Velero Architecture](#velero-architecture)

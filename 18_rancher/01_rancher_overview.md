@@ -1,6 +1,10 @@
 # Rancher Overview (Multi-Cluster Management)
 > Module 18 · Lesson 01 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [What Rancher Adds on Top of Kubernetes](#what-rancher-adds-on-top-of-kubernetes)
@@ -92,6 +96,9 @@ Use Rancher when:
 Skip Rancher (for now) when:
 - You have a single small cluster and prefer `kubectl` + one GitOps tool.
 - You do not want an additional platform component to maintain.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

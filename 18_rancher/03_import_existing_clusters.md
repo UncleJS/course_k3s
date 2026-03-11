@@ -1,6 +1,10 @@
 # Import Existing Clusters into Rancher
 > Module 18 · Lesson 03 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [What “Import” Does](#what-import-does)
@@ -82,6 +86,9 @@ In Rancher UI:
 - **Cannot reach Rancher URL**: downstream cluster must reach `https://<rancher-hostname>` (DNS + routing).
 - **Private CA issues**: ensure your Rancher install is configured for private CA (`privateCA`) and downstream nodes trust it.
 - **NetworkPolicy/egress blocks**: allow egress from `cattle-system` to the Rancher hostname.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

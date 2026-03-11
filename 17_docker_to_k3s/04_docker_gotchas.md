@@ -1,6 +1,10 @@
 # Docker Gotchas When Moving to k3s
 > Module 17 · Lesson 04 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [host.docker.internal — The Vanishing Hostname](#hostdockerinternal--the-vanishing-hostname)
@@ -1006,6 +1010,9 @@ EOF
 #    Fix: Add: RUN adduser -D appuser && chown -R appuser /app
 #         Add: USER appuser
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

@@ -1,6 +1,10 @@
 # Images and Registries: From Docker to k3s
 > Module 17 · Lesson 03 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [How k3s Pulls Images vs Docker](#how-k3s-pulls-images-vs-docker)
@@ -911,6 +915,9 @@ kubectl wait --for=condition=Ready nodes --all --timeout=60s
 # Pull using the registry config (no imagePullSecret needed)
 sudo crictl pull ghcr.io/$GITHUB_USER/taskr-web:lab-1.0.0
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

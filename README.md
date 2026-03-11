@@ -96,6 +96,9 @@ flowchart TD
     style V fill:#14b8a6,color:#fff
 ```
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 00 — Prerequisites
@@ -105,6 +108,9 @@ flowchart TD
 | Lesson | File |
 |--------|------|
 | 01 | [Linux & Containers Primer](00_prerequisites/01_linux_and_containers_primer.md) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -117,6 +123,9 @@ flowchart TD
 | 01 | [What is k3s?](01_introduction/01_what_is_k3s.md) |
 | 02 | [k3s vs Kubernetes](01_introduction/02_k3s_vs_k8s.md) |
 | 03 | [Architecture Overview](01_introduction/03_architecture_overview.md) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -132,6 +141,9 @@ flowchart TD
 | 04 | [Uninstall & Cleanup](02_installation/04_uninstall_and_cleanup.md) |
 | Labs | [install.sh](02_installation/labs/install.sh) · [verify.sh](02_installation/labs/verify.sh) · [uninstall.sh](02_installation/labs/uninstall.sh) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 03 — First Steps with kubectl
@@ -144,6 +156,9 @@ flowchart TD
 | 02 | [Namespaces](03_first_steps/02_namespaces.md) |
 | 03 | [Pods, Deployments & Services](03_first_steps/03_pods_deployments_services.md) |
 | Labs | [first-deployment.yaml](03_first_steps/labs/first-deployment.yaml) · [first-service.yaml](03_first_steps/labs/first-service.yaml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -158,6 +173,9 @@ flowchart TD
 | 03 | [DNS & CoreDNS](04_networking/03_dns_coredns.md) |
 | Labs | [clusterip-service.yaml](04_networking/labs/clusterip-service.yaml) · [nodeport-service.yaml](04_networking/labs/nodeport-service.yaml) · [dns-test-pod.yaml](04_networking/labs/dns-test-pod.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 05 — Storage
@@ -170,6 +188,9 @@ flowchart TD
 | 02 | [Persistent Volumes & PVCs](05_storage/02_persistent_volumes.md) |
 | 03 | [Longhorn Setup](05_storage/03_longhorn_setup.md) |
 | Labs | [pvc-local-path.yaml](05_storage/labs/pvc-local-path.yaml) · [longhorn-storageclass.yaml](05_storage/labs/longhorn-storageclass.yaml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -185,6 +206,9 @@ flowchart TD
 | 04 | [Node Labels, Taints & Affinity](06_multi_node_cluster/04_node_labels_taints_affinity.md) |
 | Labs | [join-agent.sh](06_multi_node_cluster/labs/join-agent.sh) · [affinity-deployment.yaml](06_multi_node_cluster/labs/affinity-deployment.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 07 — Ingress & TLS
@@ -198,6 +222,9 @@ flowchart TD
 | 03 | [cert-manager & Let's Encrypt](07_ingress_and_tls/03_cert_manager_lets_encrypt.md) |
 | Labs | [ingress-basic.yaml](07_ingress_and_tls/labs/ingress-basic.yaml) · [ingressroute-tls.yaml](07_ingress_and_tls/labs/ingressroute-tls.yaml) · [cert-manager-issuer.yaml](07_ingress_and_tls/labs/cert-manager-issuer.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 08 — Helm
@@ -210,6 +237,9 @@ flowchart TD
 | 02 | [Helm with k3s](08_helm/02_helm_with_k3s.md) |
 | 03 | [Writing Your Own Charts](08_helm/03_writing_charts.md) |
 | Labs | [values-override.yaml](08_helm/labs/values-override.yaml) · [mychart/](08_helm/labs/mychart/) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -226,6 +256,9 @@ flowchart TD
 | 05 | [Hardening Guide](09_security/05_hardening_guide.md) |
 | Labs | [rbac-role.yaml](09_security/labs/rbac-role.yaml) · [network-policy-deny-all.yaml](09_security/labs/network-policy-deny-all.yaml) · [sealed-secret-example.yaml](09_security/labs/sealed-secret-example.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 10 — Monitoring
@@ -238,6 +271,9 @@ flowchart TD
 | 02 | [Grafana Dashboards](10_monitoring/02_grafana_dashboards.md) |
 | 03 | [Alerting](10_monitoring/03_alerting.md) |
 | Labs | [prometheus-values.yaml](10_monitoring/labs/prometheus-values.yaml) · [alertmanager-config.yaml](10_monitoring/labs/alertmanager-config.yaml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -253,6 +289,9 @@ flowchart TD
 | 04 | [Managing Apps with GitOps](11_gitops/04_managing_apps_with_gitops.md) |
 | Labs | [flux-kustomization.yaml](11_gitops/labs/flux-kustomization.yaml) · [argocd-application.yaml](11_gitops/labs/argocd-application.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 12 — CI/CD Pipelines
@@ -265,6 +304,9 @@ flowchart TD
 | 02 | [GitHub Actions Deploy](12_cicd/02_github_actions_deploy.md) |
 | 03 | [Gitea + Act Runner (On-Prem)](12_cicd/03_gitea_act_runner_onprem.md) |
 | Labs | [github-actions-deploy.yml](12_cicd/labs/github-actions-deploy.yml) · [gitea-workflow.yml](12_cicd/labs/gitea-workflow.yml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -279,6 +321,9 @@ flowchart TD
 | 03 | [Cluster Restore](13_backup_and_dr/03_cluster_restore.md) |
 | Labs | [etcd-snapshot.sh](13_backup_and_dr/labs/etcd-snapshot.sh) · [velero-backup.yaml](13_backup_and_dr/labs/velero-backup.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 14 — Maintenance
@@ -291,6 +336,9 @@ flowchart TD
 | 02 | [Node Drain & Cordon](14_maintenance/02_node_drain_cordon.md) |
 | 03 | [Resource Management](14_maintenance/03_resource_management.md) |
 | Labs | [resource-quota.yaml](14_maintenance/labs/resource-quota.yaml) · [limit-range.yaml](14_maintenance/labs/limit-range.yaml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -307,6 +355,9 @@ flowchart TD
 | 05 | [Performance Tuning](15_troubleshooting/05_performance_tuning.md) |
 | Labs | [debug-pod.yaml](15_troubleshooting/labs/debug-pod.yaml) · [netshoot-pod.yaml](15_troubleshooting/labs/netshoot-pod.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 16 — Moving from Podman to k3s
@@ -320,6 +371,9 @@ flowchart TD
 | 03 | [Images and Registries](16_podman_to_k3s/03_images_and_registries.md) |
 | 04 | [Full Migration Walkthrough](16_podman_to_k3s/04_migration_walkthrough.md) |
 | Labs | [podman-compose-example.yml](16_podman_to_k3s/labs/podman-compose-example.yml) · [compose-to-k3s.yaml](16_podman_to_k3s/labs/compose-to-k3s.yaml) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 
@@ -336,6 +390,9 @@ flowchart TD
 | 05 | [Full Migration Walkthrough](17_docker_to_k3s/05_migration_walkthrough.md) |
 | Labs | [docker-compose-example.yml](17_docker_to_k3s/labs/docker-compose-example.yml) · [docker-compose-to-k3s.yaml](17_docker_to_k3s/labs/docker-compose-to-k3s.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## Module 18 — Rancher (Multi-Cluster Management)
@@ -350,6 +407,9 @@ flowchart TD
 | 04 | [Fleet Basics](18_rancher/04_fleet_basics.md) |
 | Labs | [install-rancher.sh](18_rancher/labs/install-rancher.sh) · [uninstall-rancher.sh](18_rancher/labs/uninstall-rancher.sh) · [rancher-values.yaml](18_rancher/labs/rancher-values.yaml) · [fleet-gitrepo.yaml](18_rancher/labs/fleet-gitrepo.yaml) |
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ---
 
 ## How to Use This Course
@@ -361,6 +421,9 @@ flowchart TD
 5. **Consult the [Glossary](GLOSSARY.md)** to look up unfamiliar terms at any point
 6. **Re-read the troubleshooting module** whenever you get stuck in production
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
+
 ## Requirements
 
 | Requirement | Detail |
@@ -371,6 +434,9 @@ flowchart TD
 | Disk | 5 GB minimum |
 | Network | Internet access for initial install (air-gap install covered in Module 02) |
 | Tools | `curl`, `bash`, optional: `git`, `helm`, `flux`, `argocd` CLI |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](README.md)
+
 
 ---
 

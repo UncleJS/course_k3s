@@ -1,10 +1,11 @@
 # Full Migration Walkthrough: Podman to k3s
 > Module 16 · Lesson 04 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
-- [Overview](#overview)
-- [The Example Application](#the-example-application)
-- [Pre-Migration Checklist](#pre-migration-checklist)
 - [Phase 1: Assess Your Existing Podman Setup](#phase-1-assess-your-existing-podman-setup)
 - [Quadlet-to-Manifest Conversion Script](#quadlet-to-manifest-conversion-script)
 - [Phase 2: Build and Push Images to a Registry](#phase-2-build-and-push-images-to-a-registry)
@@ -12,75 +13,45 @@
 - [Systemd Unit → Kubernetes Job Pattern](#systemd-unit--kubernetes-job-pattern)
 - [Database Migration Jobs](#database-migration-jobs)
 - [NetworkPolicy Translation](#networkpolicy-translation)
-- [SealedSecrets Setup](#sealedsecrets-setup)
-- [Phase 4: Test in a Staging Namespace](#phase-4-test-in-a-staging-namespace)
-- [Kustomize Promotion Flow](#kustomize-promotion-flow)
 - [Phase 5: Data Migration](#phase-5-data-migration)
 - [Phase 6: Cutover](#phase-6-cutover)
 - [Canary Deployment Pattern](#canary-deployment-pattern)
 - [Phase 7: Post-Migration Validation](#phase-7-post-migration-validation)
 - [Post-Migration Runbook Template](#post-migration-runbook-template)
-- [Rollback Plan](#rollback-plan)
-- [Migration Timeline Diagram](#migration-timeline-diagram)
-- [Common Pitfalls](#common-pitfalls)
 - [Further Reading](#further-reading)
 - [Lab](#lab)
 
 ---
 
 ## Overview
-
-This lesson walks through a complete, realistic migration from a Podman-based workload to k3s. We will follow a structured seven-phase process that minimises risk and allows rollback at every step. By the end, you will have a reusable migration playbook for any Podman workload.
-
 ```mermaid
 flowchart LR
     P1[Phase 1 Assess] --> P2[Phase 2 Build & Push]
     P2 --> P3[Phase 3 Write Manifests]
-    P3 --> P4[Phase 4 Staging Test]
-    P4 --> P5[Phase 5 Data Migration]
-    P5 --> P6[Phase 6 Cutover]
     P6 --> P7[Phase 7 Validate]
     P6 -.->|if issues| RB[Rollback]
     RB -.-> P1
-
-    style RB fill:#742a2a,color:#fed7d7
-    style P6 fill:#1a365d,color:#e2e8f0
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
-
-## The Example Application
-
 Throughout this lesson we migrate **"Taskr"** — a task-management web app with:
 
 | Component | Technology | Podman setup |
 |---|---|---|
-| Web frontend + API | Node.js 20 | `podman run` via systemd |
-| Database | PostgreSQL 15 | `podman run` with named volume |
-| Cache / session store | Redis 7 | `podman run` with named volume |
 | Reverse proxy | Caddy 2 | `podman run` on port 443 |
 | Data volume | `taskr_pgdata` / `taskr_redis` | Podman named volumes |
 
-[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
-
----
 
 ## Pre-Migration Checklist
 
 Run through this checklist **before** starting any migration work:
-
-```
-[ ] k3s cluster is running and healthy (kubectl get nodes shows Ready)
 [ ] kubectl context is pointing at the correct cluster
 [ ] A container registry is accessible (Docker Hub, GHCR, or local)
 [ ] Podman is installed on the build host
 [ ] You have a tested backup of all Podman volumes
 [ ] You know the current DNS name / IP address used to reach the app
-[ ] You have noted all environment variables the containers use
-[ ] You have noted all ports exposed by each container
-[ ] You have a maintenance window or blue/green strategy planned
 [ ] Monitoring / alerting is in place for the new cluster
 [ ] A rollback procedure is documented and tested
 ```
@@ -1324,6 +1295,9 @@ Copy and fill this template into your team's wiki or ops repository after a succ
 ```markdown
 # Runbook: Taskr on k3s
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Quick Reference
 - **Namespace:** taskr
 - **Cluster:** k3s-prod (kubectl context: k3s-prod)
@@ -1331,10 +1305,16 @@ Copy and fill this template into your team's wiki or ops repository after a succ
 - **Ingress:** taskr.example.com (Traefik IngressRoute)
 - **Manifests:** https://github.com/myorg/taskr/tree/main/k8s/
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Health Check
 kubectl get pods -n taskr
 kubectl top pods -n taskr
 curl -sf https://taskr.example.com/healthz
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ## Deploy New Version
 1. Push image: podman push ghcr.io/myorg/taskr-web:<new-tag>
@@ -1342,33 +1322,57 @@ curl -sf https://taskr.example.com/healthz
 3. kubectl apply -k k8s/overlays/production
 4. kubectl rollout status deployment/web -n taskr
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Rollback
 kubectl rollout undo deployment/web -n taskr
 kubectl rollout history deployment/web -n taskr
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Database Access
 kubectl exec -n taskr statefulset/postgres -- psql -U taskr -d taskr
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ## Restart a Component
 kubectl rollout restart deployment/web -n taskr
 kubectl rollout restart deployment/redis -n taskr
 kubectl rollout restart statefulset/postgres -n taskr
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## View Logs
 kubectl logs deployment/web -n taskr --tail=100 --follow
 kubectl logs statefulset/postgres -n taskr --tail=50
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Scale Manually
 kubectl scale deployment/web --replicas=3 -n taskr
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ## Backup Database
 kubectl exec -n taskr statefulset/postgres -- \
   pg_dump -U taskr -d taskr -F c > /backup/taskr-$(date +%Y%m%d).pgdump
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
 ## Secret Rotation
 kubectl delete secret taskr-secrets -n taskr
 # Update sealed secret, then:
 kubectl apply -f k8s/overlays/production/sealed-secret-prod.yaml
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ## Emergency Contacts
 - On-call: @ops-team (PagerDuty)

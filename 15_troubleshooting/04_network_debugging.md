@@ -1,6 +1,10 @@
 # Network Debugging
 > Module 15 · Lesson 04 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 1. [Network Troubleshooting Flowchart](#network-troubleshooting-flowchart)
 2. [DNS Debugging In-Cluster](#dns-debugging-in-cluster)

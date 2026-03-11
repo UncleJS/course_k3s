@@ -1,6 +1,10 @@
 # Node Drain and Cordon
 > Module 14 · Lesson 02 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 1. [Node Cordon — Stop Scheduling](#node-cordon--stop-scheduling)
 2. [Node Drain — Evict Pods Safely](#node-drain--evict-pods-safely)

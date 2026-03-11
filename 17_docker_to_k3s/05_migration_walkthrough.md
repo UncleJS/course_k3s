@@ -1,6 +1,10 @@
 # Full Migration Walkthrough: Docker to k3s
 > Module 17 · Lesson 05 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [The Example Application](#the-example-application)
@@ -1550,6 +1554,9 @@ kubectl exec -n taskr-lab postgres-0 -- \
 docker rm -f taskr-pg-source
 kubectl delete namespace taskr-lab
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 
 ---
 

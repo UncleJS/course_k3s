@@ -1,6 +1,10 @@
 # Translating Docker Compose to Kubernetes Manifests
 > Module 17 · Lesson 02 | [↑ Course Index](../README.md)
 
+
+[![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
+
 ## Table of Contents
 - [Overview](#overview)
 - [A Typical Docker Compose App](#a-typical-docker-compose-app)
