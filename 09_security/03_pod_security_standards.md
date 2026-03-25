@@ -1,14 +1,14 @@
 # Pod Security Standards
 > Module 09 · Lesson 03 | [↑ Course Index](../README.md)
 
-
 [![Course Index](https://img.shields.io/badge/Course-Index-0f766e)](../README.md)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](../LICENSE.md)
 
 ## Table of Contents
 - [Overview](#overview)
-- [From PSP to PSA](#from-psp-to-psa)
-- [The Three Policy Levels](#the-three-policy-levels)
+- [PSS vs PSP — What Changed and Why](#pss-vs-psp--what-changed-and-why)
+- [The Three PSS Levels in Detail](#the-three-pss-levels-in-detail)
+- [PSS Levels Comparison](#pss-levels-comparison)
 - [Pod Security Admission — How It Works](#pod-security-admission--how-it-works)
 - [Namespace Labels](#namespace-labels)
 - [SecurityContext Fields](#securitycontext-fields)
@@ -17,8 +17,11 @@
   - [capabilities](#capabilities)
   - [seccompProfile](#seccompprofile)
   - [allowPrivilegeEscalation](#allowprivilegeescalation)
-- [Common Patterns for Secure Pods](#common-patterns-for-secure-pods)
+- [Common Violations and Fixes](#common-violations-and-fixes)
 - [Exemptions](#exemptions)
+- [Migrating from PSP to PSS](#migrating-from-psp-to-pss)
+- [PSS with Kyverno/OPA](#pss-with-kyvernoopa)
+- [Common Patterns for Secure Pods](#common-patterns-for-secure-pods)
 - [Lab](#lab)
 
 ---
@@ -27,88 +30,158 @@
 
 Pod Security Standards (PSS) define three policy levels for pod workloads — Privileged, Baseline, and Restricted — and Pod Security Admission (PSA) enforces them at the namespace level without requiring a third-party webhook. PSA replaced the deprecated PodSecurityPolicy (PSP) in Kubernetes 1.25.
 
+PSS answers a simple question: **"How much host access can a pod claim?"** The answer ranges from "anything" (Privileged) to "almost nothing" (Restricted). By labelling a namespace with the appropriate level, you establish a security floor for all pods running in it.
+
+k3s v1.25+ ships with PSA enabled out of the box. No additional components, controllers, or webhook configurations are required.
+
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 
-## From PSP to PSA
+## PSS vs PSP — What Changed and Why
 
-PodSecurityPolicy (PSP) was deprecated in Kubernetes 1.21 and removed in 1.25. It was powerful but notoriously difficult to configure correctly — a common source of privilege escalation bugs due to misconfigured bindings.
+PodSecurityPolicy (PSP) was deprecated in Kubernetes 1.21 and **removed in 1.25**. k3s v1.25+ ships entirely without PSP support.
+
+### Why PSP was removed
+
+PSP was powerful but had serious usability and security problems:
+
+1. **Complex RBAC bindings:** PSPs required explicit RBAC bindings to take effect. It was trivially easy to create a restrictive PSP, believe your cluster was hardened, and then discover that the binding was missing and the policy was never applied.
+2. **Privilege escalation via misconfiguration:** A service account with `use` permission on a permissive PSP could create privileged pods even if that was not intended.
+3. **No per-namespace defaults:** PSPs were cluster-scoped, making it hard to apply different policies to different namespaces without complex RBAC trees.
+4. **Confusing evaluation order:** When a service account matched multiple PSPs, the least restrictive one often silently won.
+
+### What PSA does differently
+
+PSA is a built-in admission controller that:
+- Is configured via **namespace labels** — no RBAC bindings needed
+- Applies **three simple, well-defined levels** instead of arbitrary policy objects
+- Supports **three independent modes** per namespace (enforce, warn, audit)
+- Has no privilege escalation via misconfiguration — a label either matches a level or it doesn't
+- Is always active — you cannot accidentally leave it unbound
 
 ```mermaid
 timeline
     title Pod Security Evolution
-    section Kubernetes ≤ 1.20
-        PodSecurityPolicy (PSP) : Admission plugin
+    section "Kubernetes 1.18-1.20"
+        PodSecurityPolicy active : Admission plugin
         : Cluster-wide, complex RBAC bindings
-        : Easy to misconfigure
-    section Kubernetes 1.21-1.24
+        : Easy to misconfigure silently
+    section "Kubernetes 1.21-1.24"
         PSP deprecated : PSP still works but deprecated
-        PSA introduced as alpha : New replacement
-    section Kubernetes 1.25+
+        PSA introduced as alpha/beta : New simpler replacement
+    section "Kubernetes 1.25+"
         PSP removed : k3s v1.25+ ships without PSP
         PSA stable : Built-in admission controller
         : Namespace-scoped via labels
-        : Simple, no RBAC required
+        : No RBAC required
 ```
-
-k3s v1.25+ ships with PSA enabled. No additional components or controllers are required.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
 
-## The Three Policy Levels
-
-```mermaid
-graph TD
-    subgraph "Privileged"
-        P[No restrictions Full host access allowed For trusted system components]
-    end
-    subgraph "Baseline"
-        B[Prevents known privilege escalations Blocks hostNetwork/PID/IPC Blocks privileged containers Allows most workloads]
-    end
-    subgraph "Restricted"
-        R[Hardened best-practices Requires non-root user Requires seccomp profile Drops all capabilities Read-only root FS recommended]
-    end
-
-    P --> B --> R
-    style P fill:#ff6b6b,color:#fff
-    style B fill:#ffd93d,color:#333
-    style R fill:#6bcb77,color:#fff
-```
+## The Three PSS Levels in Detail
 
 ### Privileged
 
-No restrictions. Everything is allowed. Intended only for:
-- Trusted system-level components (CNI plugins, storage drivers)
+**No restrictions.** Everything is allowed. Equivalent to running with no Pod Security policy at all.
+
+Appropriate for:
+- Trusted system-level components that require host-level access (CNI plugins, storage drivers, node exporters)
+- The `kube-system` namespace — k3s internal components (Traefik, CoreDNS, Flannel) require privileged access
 - Workloads that explicitly require host namespaces or privileged containers
-- The `kube-system` namespace (k3s internal components)
+
+A pod at the Privileged level can:
+- Mount any host path
+- Use `hostNetwork`, `hostPID`, `hostIPC`
+- Run `privileged: true` containers
+- Use any Linux capabilities
+- Run as root
+
+> **Never use Privileged for application workloads.** It is intended only for infrastructure components.
 
 ### Baseline
 
-Prevents known privilege escalation vectors while allowing most containerised applications to run without modification. Blocks:
-- Privileged containers (`securityContext.privileged: true`)
-- `hostNetwork: true`, `hostPID: true`, `hostIPC: true`
-- Dangerous capabilities (`NET_ADMIN`, `SYS_ADMIN`, etc.)
-- Host path volume mounts (except specific safe paths)
-- `hostPort` usage
+**Prevents known privilege escalation vectors** while allowing most containerised applications to run without modification. This is the practical "safe default" for most workloads.
 
-Does **not** require:
-- Running as non-root
-- A seccomp profile
-- Dropping all capabilities
+Baseline **blocks:**
+- `securityContext.privileged: true`
+- `hostNetwork: true`, `hostPID: true`, `hostIPC: true`
+- Dangerous capabilities: `NET_ADMIN`, `SYS_ADMIN`, `SYS_TIME`, `NET_RAW`, and others
+- Host path volume mounts (any `hostPath` volume)
+- `hostPort` usage
+- Unsafe sysctls
+
+Baseline **allows:**
+- Running as root (UID 0)
+- No seccomp profile
+- `allowPrivilegeEscalation: true` (default)
+- Most standard volume types (emptyDir, ConfigMap, PVC, projected, etc.)
+
+Baseline is the right starting point when adopting PSS on existing workloads that have not been security-hardened.
 
 ### Restricted
 
-Implements security best practices. Requires:
-- `runAsNonRoot: true`
-- `seccompProfile` set to `RuntimeDefault` or `Localhost`
-- `allowPrivilegeEscalation: false`
-- All capabilities dropped (no `add`)
-- Volume types limited to a safe allowlist
+**Implements Kubernetes security best practices.** This is the hardened target for all new application workloads.
 
-Most application containers should target Restricted after initial development.
+Restricted **requires:**
+- `runAsNonRoot: true`
+- `seccompProfile.type: RuntimeDefault` or `Localhost`
+- `allowPrivilegeEscalation: false`
+- `capabilities.drop: [ALL]` — no capability additions allowed
+- Volume types limited to an allowlist (ConfigMap, downwardAPI, emptyDir, projected, PVC, ephemeral)
+
+Restricted **does not require** (but recommends):
+- `readOnlyRootFilesystem: true`
+- Specific UID/GID values
+
+Most new microservices can comply with Restricted with minimal effort. The main barrier is older images that run as root by default.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## PSS Levels Comparison
+
+```mermaid
+graph LR
+    subgraph "Privileged"
+        P1["hostNetwork: allowed"]
+        P2["hostPID: allowed"]
+        P3["hostIPC: allowed"]
+        P4["privileged container: allowed"]
+        P5["allowPrivilegeEscalation: allowed"]
+        P6["runAsRoot: allowed"]
+        P7["capabilities: any"]
+        P8["seccompProfile: none required"]
+        P9["volumes: any including hostPath"]
+    end
+
+    subgraph "Baseline"
+        B1["hostNetwork: BLOCKED"]
+        B2["hostPID: BLOCKED"]
+        B3["hostIPC: BLOCKED"]
+        B4["privileged container: BLOCKED"]
+        B5["allowPrivilegeEscalation: allowed"]
+        B6["runAsRoot: allowed"]
+        B7["capabilities: dangerous ones BLOCKED"]
+        B8["seccompProfile: none required"]
+        B9["volumes: hostPath BLOCKED"]
+    end
+
+    subgraph "Restricted"
+        R1["hostNetwork: BLOCKED"]
+        R2["hostPID: BLOCKED"]
+        R3["hostIPC: BLOCKED"]
+        R4["privileged container: BLOCKED"]
+        R5["allowPrivilegeEscalation: BLOCKED"]
+        R6["runAsRoot: BLOCKED"]
+        R7["capabilities: MUST drop ALL"]
+        R8["seccompProfile: RuntimeDefault REQUIRED"]
+        R9["volumes: allowlist only"]
+    end
+```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -116,44 +189,79 @@ Most application containers should target Restricted after initial development.
 
 ## Pod Security Admission — How It Works
 
-PSA operates as a built-in admission webhook that intercepts pod creation/modification requests:
+PSA operates as a built-in admission webhook that intercepts pod creation and modification requests. It reads the PSS labels on the target namespace and evaluates the incoming pod spec against the corresponding policy level.
 
 ```mermaid
-sequenceDiagram
-    participant User
-    participant API as API Server
-    participant PSA as Pod Security Admission
-    participant NS as Namespace (labels)
+flowchart TD
+    REQ(["kubectl apply pod.yaml"]) --> API["API Server"]
+    API --> PSA["Pod Security Admission Controller"]
+    PSA --> NS["Read namespace labels<br/>pod-security.kubernetes.io/*"]
 
-    User->>API: kubectl apply pod.yaml
-    API->>PSA: Admit pod?
-    PSA->>NS: Read security labels
-    NS-->>PSA: enforce=restricted warn=restricted audit=restricted
-    PSA->>PSA: Evaluate pod spec against policy level
-    alt Pod meets policy
-        PSA-->>API: Allow
-        API-->>User: pod/my-pod created
-    else Pod violates enforce level
-        PSA-->>API: Deny
-        API-->>User: Error: violates PodSecurity
-    else Pod violates warn/audit only
-        PSA-->>API: Allow (with warning)
-        API-->>User: Warning: ... pod/my-pod created
-    end
+    NS --> Q1{"enforce label set?"}
+    Q1 -->|"Yes"| CHECK_E["Evaluate pod spec<br/>against enforce level"]
+    CHECK_E --> Q2{"Pod violates<br/>enforce policy?"}
+    Q2 -->|"Yes"| REJECT["Reject request<br/>Error: violates PodSecurity"]
+    Q2 -->|"No"| ALLOW["Allow pod creation"]
+
+    Q1 -->|"No"| ALLOW
+
+    NS --> Q3{"warn label set?"}
+    Q3 -->|"Yes - pod violates warn"| WARN["Add Warning header<br/>to API response"]
+    Q3 -->|"No or compliant"| SKIP_WARN["No warning"]
+
+    NS --> Q4{"audit label set?"}
+    Q4 -->|"Yes - pod violates audit"| AUDIT["Add annotation to<br/>audit log entry"]
+    Q4 -->|"No or compliant"| SKIP_AUDIT["No audit annotation"]
+
+    ALLOW --> DONE(["Pod created"])
+    WARN --> DONE
+    SKIP_WARN --> DONE
+    SKIP_AUDIT --> DONE
 ```
 
 ### Three modes
 
-| Mode | Effect |
-|---|---|
-| `enforce` | Reject pods that violate the policy |
-| `warn` | Allow the pod but emit a user-facing warning |
-| `audit` | Allow the pod but add an audit annotation (visible in audit logs) |
+| Mode | Effect | When to use |
+|---|---|---|
+| `enforce` | Reject pods that violate the policy | Production readiness gate |
+| `warn` | Allow the pod but emit a user-facing warning in `kubectl` output | Pre-enforcement testing |
+| `audit` | Allow the pod but add an audit annotation (visible in audit logs) | Discovery/reporting |
 
-You can set each mode to a different level. A common progression:
+You can set each mode to a **different level**. A common migration progression:
 
 ```
-audit=restricted → warn=restricted → enforce=restricted
+audit=restricted           # Step 1: discover violations silently
+→ warn=restricted          # Step 2: notify developers via warnings
+→ enforce=baseline         # Step 3: block the most dangerous pods
+→ enforce=restricted       # Step 4: full hardening
+```
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant API as "API Server"
+    participant PSA as "PSA Controller"
+    participant AUDIT as "Audit Log"
+
+    Dev->>API: kubectl apply (non-compliant pod)
+    API->>PSA: Admit?
+
+    Note over PSA: enforce=baseline, warn=restricted, audit=restricted
+
+    PSA->>PSA: Check against baseline level
+    PSA->>PSA: Check against restricted level
+
+    alt Violates enforce (baseline)
+        PSA-->>API: Deny
+        API-->>Dev: Error - violates PodSecurity "baseline"
+    else Passes enforce, violates warn+audit (restricted)
+        PSA-->>AUDIT: Write audit annotation
+        PSA-->>API: Allow + Warning
+        API-->>Dev: Warning: would violate restricted<br/>pod/my-app created
+    else Passes all levels
+        PSA-->>API: Allow
+        API-->>Dev: pod/my-app created
+    end
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -200,6 +308,27 @@ kubectl label namespace my-app \
   --dry-run=server
 ```
 
+### Why use different levels per mode
+
+You can have each mode set to a different level on purpose. The most useful configurations are:
+
+```yaml
+# Conservative — warn about restricted violations, enforce only baseline
+pod-security.kubernetes.io/enforce: baseline
+pod-security.kubernetes.io/warn: restricted
+pod-security.kubernetes.io/audit: restricted
+```
+
+This lets developers see that their pod would violate Restricted (via CLI warnings) without blocking their workflow, while still preventing the most dangerous configurations (Baseline violations).
+
+```yaml
+# Audit-only — no disruption, just collecting data
+pod-security.kubernetes.io/audit: restricted
+# No enforce or warn labels
+```
+
+Use this on existing namespaces during initial assessment to understand what would break before touching anything.
+
 ### Progression strategy
 
 ```bash
@@ -227,12 +356,12 @@ kubectl label namespace my-app \
 ```mermaid
 graph LR
     subgraph "Pod-level (spec.securityContext)"
-        PN[runAsUser runAsGroup runAsNonRoot fsGroup seccompProfile sysctls]
+        PN["runAsUser<br/>runAsGroup<br/>runAsNonRoot<br/>fsGroup<br/>seccompProfile<br/>sysctls"]
     end
     subgraph "Container-level (containers[].securityContext)"
-        CN[runAsUser runAsNonRoot readOnlyRootFilesystem allowPrivilegeEscalation capabilities privileged seccompProfile]
+        CN["runAsUser<br/>runAsNonRoot<br/>readOnlyRootFilesystem<br/>allowPrivilegeEscalation<br/>capabilities<br/>privileged<br/>seccompProfile"]
     end
-    CN -->|overrides| PN
+    CN -->|"overrides pod-level"| PN
 ```
 
 ### runAsNonRoot
@@ -328,6 +457,227 @@ This is required at the **Restricted** level and is a best practice at **Baselin
 
 ---
 
+## Common Violations and Fixes
+
+When PSA rejects or warns about a pod, the error message tells you exactly which field violated which policy. Here are the most common ones and how to fix them:
+
+| Violation Message | Cause | Fix |
+|---|---|---|
+| `privileged` | `securityContext.privileged: true` | Remove `privileged: true` or move workload to a Privileged namespace |
+| `hostNamespaces` | `hostNetwork`, `hostPID`, or `hostIPC: true` | Remove the host namespace fields |
+| `hostPath` volumes | Volume of type `hostPath` | Replace with `emptyDir`, ConfigMap, PVC, or other allowed type |
+| `allowPrivilegeEscalation != false` | Missing or `true` | Add `allowPrivilegeEscalation: false` to container securityContext |
+| `unrestricted capabilities` | Missing `capabilities.drop: [ALL]` | Add drop ALL; only add back what's truly needed |
+| `runAsNonRoot != true` | Image runs as root and no override | Set `runAsNonRoot: true` and `runAsUser: <non-zero>` |
+| `seccompProfile` | Missing `seccompProfile` field | Add `seccompProfile: {type: RuntimeDefault}` |
+| `restricted volume types` | Using a volume type not in the allowlist | Replace with ConfigMap, emptyDir, PVC, projected, or downwardAPI |
+| `hostPort` | Container uses `hostPort` | Remove `hostPort`; use a Service with NodePort or LoadBalancer instead |
+
+### Decoding the error
+
+When a pod is rejected, PSA outputs a detailed error:
+
+```
+Error from server (Forbidden): pods "my-pod" is forbidden: violates PodSecurity "restricted:latest":
+  allowPrivilegeEscalation != false (container "app" must set securityContext.allowPrivilegeEscalation=false)
+  unrestricted capabilities (container "app" must set securityContext.capabilities.drop=["ALL"])
+  runAsNonRoot != true (pod or container "app" must set securityContext.runAsNonRoot=true)
+  seccompProfile (pod or containers "app" must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost")
+```
+
+Each line is a separate violation you need to fix. Address all of them before the pod will be admitted.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Exemptions
+
+Some workloads (monitoring agents, storage drivers, CNI pods) legitimately need privileged access. PSA supports cluster-level exemptions configured on the API server.
+
+### Namespace exemptions (most common)
+
+The `kube-system` namespace must be exempted, or k3s internal components (Traefik, CoreDNS, Flannel) will fail admission. k3s handles this automatically for `kube-system`, `kube-public`, and `kube-node-lease`.
+
+```yaml
+# /etc/rancher/k3s/config.yaml (k3s config)
+kube-apiserver-arg:
+  - "admission-plugins=NodeRestriction,PodSecurity"
+```
+
+```yaml
+# AdmissionConfiguration (passed via --admission-control-config-file)
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1
+      kind: PodSecurityConfiguration
+      defaults:
+        enforce: baseline
+        enforce-version: latest
+        warn: restricted
+        warn-version: latest
+        audit: restricted
+        audit-version: latest
+      exemptions:
+        # Exempt specific usernames (e.g., node bootstrap or CI service accounts)
+        usernames: []
+        # Exempt specific runtime class names (e.g., kata containers)
+        runtimeClasses: []
+        # Exempt entire namespaces from policy enforcement
+        namespaces:
+          - kube-system
+          - kube-public
+          - kube-node-lease
+          - monitoring      # e.g., if Prometheus needs privileged node-exporter
+```
+
+### Per-namespace exemption via label
+
+For a single namespace that needs elevated access, simply apply a more permissive label:
+
+```bash
+# Allow privileged workloads in the monitoring namespace
+kubectl label namespace monitoring \
+  pod-security.kubernetes.io/enforce=privileged \
+  --overwrite
+
+# Still warn about restricted violations
+kubectl label namespace monitoring \
+  pod-security.kubernetes.io/warn=restricted \
+  --overwrite
+```
+
+> **Note:** The `kube-system` namespace must always be exempted or k3s internal components (Traefik, CoreDNS, etc.) will fail admission. k3s handles this automatically.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Migrating from PSP to PSS
+
+If you are managing an older k3s cluster that was using PSP (k3s < 1.25) and you are upgrading, or if you are inheriting a cluster with PSP configuration, follow this migration approach.
+
+### Step 1 — Audit your existing PSPs
+
+```bash
+# List all PSPs and their usage
+kubectl get psp
+
+# Find which service accounts use each PSP via RBAC
+kubectl get clusterrolebindings,rolebindings -A \
+  -o jsonpath='{range .items[*]}{.metadata.name}: {.roleRef.name}{"\n"}{end}' \
+  | grep -i psp
+```
+
+### Step 2 — Map PSP settings to PSS levels
+
+| PSP Setting | PSS Equivalent |
+|---|---|
+| `privileged: false` | Baseline blocks privileged containers |
+| `allowPrivilegeEscalation: false` | Required by Restricted |
+| `hostNetwork: false`, `hostPID: false` | Required by Baseline |
+| `runAsUser: MustRunAsNonRoot` | Required by Restricted (`runAsNonRoot: true`) |
+| `volumes: configmap, emptyDir, persistentVolumeClaim` | Restricted volume allowlist |
+| `allowedCapabilities: []`, `defaultAddCapabilities: []` | Restricted drops ALL capabilities |
+
+### Step 3 — Add PSA labels in audit/warn mode first
+
+```bash
+# For each namespace, start with audit only
+for ns in $(kubectl get ns -o name | grep -v kube | grep -v default); do
+  kubectl label ${ns} pod-security.kubernetes.io/audit=restricted 2>/dev/null
+done
+```
+
+### Step 4 — Review audit logs for violations
+
+```bash
+# Grep audit log for PSA-generated annotations (if audit logging is enabled)
+sudo grep 'pod-security' /var/log/kubernetes/audit.log | jq .
+```
+
+### Step 5 — Fix violations and promote to enforce
+
+After fixing all workloads to comply with the target level, promote from `audit` to `warn` and then to `enforce`.
+
+### Step 6 — Remove PSP resources
+
+Once all namespaces are on PSA enforce and workloads are running correctly, remove PSP objects:
+
+```bash
+# After upgrading to k3s 1.25+, PSP objects are automatically removed
+# On older clusters before upgrading:
+kubectl delete psp --all
+```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## PSS with Kyverno/OPA
+
+PSS is **intentionally simple**. It covers the most important security controls but does not address:
+
+- Custom rules (e.g., "images must come from our registry")
+- Label/annotation requirements
+- Resource limits enforcement
+- Container image tag pinning (`latest` ban)
+- Network policy existence checks
+- Service account token restrictions
+
+For these use cases, you need a policy engine on top of PSS:
+
+### Kyverno (recommended for k3s)
+
+Kyverno is a Kubernetes-native policy engine that uses Kubernetes YAML — no Rego language to learn.
+
+```bash
+# Install Kyverno
+kubectl create -f https://github.com/kyverno/kyverno/releases/latest/download/install.yaml
+
+# Example: require all images to come from approved registries
+kubectl apply -f - <<EOF
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-approved-registry
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-registry
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Images must come from registry.company.com"
+        pattern:
+          spec:
+            containers:
+              - image: "registry.company.com/*"
+EOF
+```
+
+### OPA/Gatekeeper
+
+OPA Gatekeeper uses Rego policies and is more powerful but requires learning the Rego policy language.
+
+### The relationship between PSS and Kyverno/OPA
+
+These are **layered controls**, not alternatives:
+
+- **PSS** handles the universal security baseline (no privileged pods, no host namespaces)
+- **Kyverno/OPA** adds organisation-specific policy on top
+
+Always deploy both in a mature cluster.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
 ## Common Patterns for Secure Pods
 
 ### Minimal web application
@@ -399,7 +749,6 @@ metadata:
 ```bash
 # Validate an existing deployment against restricted policy
 kubectl get deployment secure-webapp -n my-app -o yaml | \
-  kubectl-neat | \
   kubectl apply --dry-run=server -f -
 
 # Check current PSS labels on all namespaces
@@ -409,50 +758,6 @@ kubectl get namespaces -o custom-columns=\
 # Use kubescape for a comprehensive PSS audit
 kubescape scan framework nsa --include-namespaces my-app
 ```
-
-[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
-
----
-
-## Exemptions
-
-Some workloads (monitoring agents, storage drivers, CNI pods) legitimately need privileged access. PSA supports cluster-level exemptions configured on the API server:
-
-```yaml
-# /etc/rancher/k3s/config.yaml (k3s config)
-kube-apiserver-arg:
-  - "admission-plugins=NodeRestriction,PodSecurity"
-```
-
-```yaml
-# AdmissionConfiguration (passed via --admission-control-config-file)
-apiVersion: apiserver.config.k8s.io/v1
-kind: AdmissionConfiguration
-plugins:
-  - name: PodSecurity
-    configuration:
-      apiVersion: pod-security.admission.config.k8s.io/v1
-      kind: PodSecurityConfiguration
-      defaults:
-        enforce: baseline
-        enforce-version: latest
-        warn: restricted
-        warn-version: latest
-        audit: restricted
-        audit-version: latest
-      exemptions:
-        # Exempt specific usernames (e.g., node bootstrap)
-        usernames: []
-        # Exempt specific runtime class names
-        runtimeClasses: []
-        # Exempt entire namespaces from policy enforcement
-        namespaces:
-          - kube-system
-          - kube-public
-          - kube-node-lease
-```
-
-> **Note:** The `kube-system` namespace must always be exempted or k3s internal components (Traefik, CoreDNS, etc.) will fail admission. k3s handles this automatically.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -478,8 +783,20 @@ kubectl run bad-pod \
   --image=nginx:alpine \
   --namespace=pss-demo
 # Expected: Error - violates PodSecurity "restricted"
+# nginx:alpine runs as root and has no seccomp profile
 
-# Test 2: Deploy a compliant pod
+# Test 2: See what warn mode shows before enforcing
+kubectl label namespace pss-demo \
+  pod-security.kubernetes.io/enforce=baseline \
+  --overwrite
+# Now enforce is baseline, warn is still restricted
+
+kubectl run partial-bad \
+  --image=nginx:alpine \
+  --namespace=pss-demo
+# Expected: Warning about restricted, but pod is created (baseline allows root)
+
+# Test 3: Deploy a compliant pod
 kubectl apply -n pss-demo -f - <<EOF
 apiVersion: v1
 kind: Pod
@@ -503,11 +820,22 @@ spec:
           drop: [ALL]
 EOF
 
+# Restore full restricted enforcement
+kubectl label namespace pss-demo \
+  pod-security.kubernetes.io/enforce=restricted \
+  --overwrite
+
 # Verify it's running
 kubectl get pod good-pod -n pss-demo
 
 # Inspect its security context
 kubectl get pod good-pod -n pss-demo -o jsonpath='{.spec.securityContext}'
+
+# Test 4: confirm bad-pod is now blocked
+kubectl run bad-pod-2 \
+  --image=nginx:alpine \
+  --namespace=pss-demo
+# Expected: Forbidden error
 
 # Check audit events (if audit logging is enabled)
 # grep 'pod-security' /var/log/kubernetes/audit.log

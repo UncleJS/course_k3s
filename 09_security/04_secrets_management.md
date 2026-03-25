@@ -34,12 +34,17 @@ Secrets management is one of the most commonly mishandled areas in Kubernetes. T
 A `Secret` is a Kubernetes object for holding small amounts of sensitive data: passwords, tokens, TLS certificates, SSH keys.
 
 ```mermaid
-graph LR
+flowchart LR
     subgraph "Secret Lifecycle"
-        CREATE[kubectl create secret or apply YAML] --> ETCD[(etcd base64 stored or AES-256 encrypted)]
-        ETCD -->|mounted| POD[Pod]
-        ETCD -->|env var| POD
-        ETCD -->|imagePullSecret| KUBELET[kubelet image pull]
+        CREATE["kubectl create secret<br/>or apply YAML"]
+        ETCD[("etcd<br/>(base64 or AES-256)")]
+        POD["Pod"]
+        KUBELET["kubelet<br/>image pull"]
+
+        CREATE --> ETCD
+        ETCD -->|"mounted as volume"| POD
+        ETCD -->|"env var injection"| POD
+        ETCD -->|"imagePullSecret"| KUBELET
     end
 ```
 
@@ -80,9 +85,11 @@ echo "UzNjdXIzUEBzcyE=" | base64 -d
 
 ```mermaid
 flowchart TD
-    SECRET["Secret YAML data:   password: UzNjdXIzUEBzcyE="] --> DECODE["base64 -d → S3cur3P@ss!"]
-    DECODE --> NOTE["⚠ Anyone who can run kubectl get secret has the plaintext value"]
+    SECRET["Secret YAML<br/>data: password: UzNjdXIzUEBzcyE="]
+    DECODE["base64 -d → S3cur3P@ss!"]
+    NOTE["Anyone who can run<br/>kubectl get secret<br/>has the plaintext value"]
 
+    SECRET --> DECODE --> NOTE
     style NOTE fill:#ff6b6b,color:#fff
 ```
 
@@ -228,11 +235,17 @@ spec:
 
 ```mermaid
 flowchart LR
-    S[Secret db-credentials] --> V[Volume /etc/secrets/db/]
-    V --> F1["/etc/secrets/db/username"]
-    V --> F2["/etc/secrets/db/password"]
-    APP[Container Process] -->|reads| F1
-    APP -->|reads| F2
+    S["Secret db-credentials"]
+    V["Volume<br/>/etc/secrets/db/"]
+    F1["/etc/secrets/db/username"]
+    F2["/etc/secrets/db/password"]
+    APP["Container Process"]
+
+    S --> V
+    V --> F1
+    V --> F2
+    APP -->|"reads"| F1
+    APP -->|"reads"| F2
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -242,6 +255,27 @@ flowchart LR
 ## Encrypting Secrets at Rest in k3s
 
 k3s uses SQLite (single-node) or an external etcd as its backing store. Secrets can be encrypted at rest using the Kubernetes `EncryptionConfiguration` feature.
+
+```mermaid
+sequenceDiagram
+    participant K as "kubectl apply"
+    participant API as "kube-apiserver"
+    participant ENC as "Encryption Provider<br/>(AES-CBC key1)"
+    participant DB as "etcd / SQLite"
+
+    K->>API: "Create Secret (plaintext)"
+    API->>ENC: "Encrypt with key1"
+    ENC-->>API: "Ciphertext"
+    API->>DB: "Store ciphertext"
+    Note over DB: "Raw DB contains only<br/>encrypted bytes"
+
+    K->>API: "Get Secret"
+    API->>DB: "Fetch ciphertext"
+    DB-->>API: "Ciphertext"
+    API->>ENC: "Decrypt with key1"
+    ENC-->>API: "Plaintext"
+    API-->>K: "Secret value"
+```
 
 ### Enable encryption in k3s
 
@@ -309,22 +343,22 @@ Sealed Secrets solve the GitOps problem: how do you store Secret manifests in Gi
 ```mermaid
 flowchart LR
     subgraph "Developer Workstation"
-        RAW["plaintext Secret YAML (NEVER commit to Git)"]
-        KUBESEAL["kubeseal CLI + cluster public key"]
-        SEALED["SealedSecret YAML ✓ Safe to commit to Git"]
+        RAW["plaintext Secret YAML<br/>(NEVER commit to Git)"]
+        KUBESEAL["kubeseal CLI<br/>+ cluster public key"]
+        SEALED["SealedSecret YAML<br/>Safe to commit to Git"]
         RAW --> KUBESEAL --> SEALED
     end
 
     subgraph "Git Repository"
-        GITSEALED["SealedSecret in Git encrypted ciphertext"]
+        GITSEALED["SealedSecret in Git<br/>(encrypted ciphertext)"]
         SEALED --> GITSEALED
     end
 
     subgraph "Kubernetes Cluster"
-        CONTROLLER["sealed-secrets-controller (holds private key)"]
-        DECRYPTED["Regular Secret automatically created by controller"]
-        GITSEALED -->|kubectl apply| CONTROLLER
-        CONTROLLER -->|decrypts and creates| DECRYPTED
+        CONTROLLER["sealed-secrets-controller<br/>(holds private key)"]
+        DECRYPTED["Regular Secret<br/>(auto-created by controller)"]
+        GITSEALED -->|"kubectl apply"| CONTROLLER
+        CONTROLLER -->|"decrypts and creates"| DECRYPTED
     end
 ```
 
@@ -389,21 +423,21 @@ For production environments with an existing secret store (HashiCorp Vault, AWS 
 ```mermaid
 flowchart LR
     subgraph "External Store"
-        VAULT[HashiCorp Vault AWS Secrets Manager Azure Key Vault GCP Secret Manager 1Password and more...]
+        VAULT["HashiCorp Vault<br/>AWS Secrets Manager<br/>Azure Key Vault<br/>GCP Secret Manager<br/>1Password..."]
     end
 
     subgraph "Kubernetes"
-        ESO[External Secrets Operator]
-        ES["ExternalSecret CR (defines what to fetch)"]
-        SS["SecretStore CR (defines how to connect)"]
-        SECRET["Secret (auto-synced)"]
+        ESO["External Secrets Operator"]
+        ES["ExternalSecret CR<br/>(defines what to fetch)"]
+        SS["SecretStore CR<br/>(defines how to connect)"]
+        SECRET["Secret<br/>(auto-synced)"]
 
         ES --> ESO
         SS --> ESO
         ESO --> SECRET
     end
 
-    VAULT -->|periodic sync| ESO
+    VAULT -->|"periodic sync"| ESO
 ```
 
 ### Quick example with Vault
@@ -463,14 +497,23 @@ spec:
 
 ```mermaid
 flowchart TD
-    Q1{Where are secrets stored?} -->|In Git| BAD1["⚠ Never commit plain Secret YAMLs to Git Use Sealed Secrets or ESO"]
-    Q1 -->|In k3s/etcd| ENCRYPT[Enable encryption at rest]
-    Q1 -->|External store| ESO_GOOD["✓ External Secrets Operator — best for production"]
+    Q1{"Where are<br/>secrets stored?"}
+    BAD1["Never commit plain Secret YAMLs to Git<br/>Use Sealed Secrets or ESO"]
+    ENCRYPT["Enable encryption at rest"]
+    ESO_GOOD["External Secrets Operator<br/>best for production"]
+    RBAC["Restrict RBAC:<br/>only needed SAs can read secrets"]
+    MOUNT["Prefer volume mounts over env vars"]
+    ROTATE["Plan for key/secret rotation"]
+    AUDIT["Audit secret access<br/>with audit logging"]
 
-    ENCRYPT --> RBAC[Restrict RBAC: only needed SAs can read secrets]
-    RBAC --> MOUNT[Prefer volume mounts over env vars]
-    MOUNT --> ROTATE[Plan for key/secret rotation]
-    ROTATE --> AUDIT[Audit secret access with audit logging]
+    Q1 -->|"In Git"| BAD1
+    Q1 -->|"In k3s/etcd"| ENCRYPT
+    Q1 -->|"External store"| ESO_GOOD
+
+    ENCRYPT --> RBAC
+    RBAC --> MOUNT
+    MOUNT --> ROTATE
+    ROTATE --> AUDIT
 ```
 
 **Summary checklist:**

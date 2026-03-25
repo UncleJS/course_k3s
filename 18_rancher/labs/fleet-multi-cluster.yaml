@@ -1,0 +1,303 @@
+# =============================================================================
+# fleet-multi-cluster.yaml
+#
+# Comprehensive Fleet multi-cluster example demonstrating:
+#   - A GitRepo targeting production clusters (env=production)
+#   - A GitRepo targeting staging clusters (env=staging) with different values
+#   - A ClusterGroup definition for "edge-clusters"
+#   - A GitRepo targeting the edge ClusterGroup
+#
+# Apply to the Rancher management cluster (NOT a downstream cluster):
+#   kubectl apply -f fleet-multi-cluster.yaml
+#
+# Prerequisites:
+#   1. Rancher with at least one downstream cluster in Active state
+#   2. Clusters labelled appropriately:
+#      kubectl label clusters.fleet.cattle.io <name> env=production -n fleet-default
+#      kubectl label clusters.fleet.cattle.io <name> env=staging   -n fleet-default
+#      kubectl label clusters.fleet.cattle.io <name> tier=edge     -n fleet-default
+#      kubectl label clusters.fleet.cattle.io <name> region=europe -n fleet-default
+# =============================================================================
+
+---
+# =============================================================================
+# ClusterGroup: edge-clusters
+#
+# A named logical group that dynamically includes all clusters with both
+# tier=edge and region=europe labels. GitRepos can target this group by name
+# instead of repeating the label selector in every GitRepo.
+#
+# To add a cluster to this group, label it:
+#   kubectl label clusters.fleet.cattle.io my-cluster \
+#     tier=edge region=europe -n fleet-default
+# =============================================================================
+apiVersion: fleet.cattle.io/v1alpha1
+kind: ClusterGroup
+metadata:
+  name: edge-clusters
+  # ClusterGroups must live in fleet-default (not fleet-local)
+  namespace: fleet-default
+  labels:
+    # Label the group itself so clusterGroupSelector can target it
+    type: edge
+    region: europe
+spec:
+  selector:
+    # matchLabels selects which Cluster objects belong to this group.
+    # A cluster must have ALL of these labels to be included.
+    matchLabels:
+      tier: edge
+      region: europe
+
+---
+# =============================================================================
+# GitRepo: production-app
+#
+# Deploys the application to ALL clusters labelled env=production.
+# Uses higher replica counts and production-tier resource limits.
+#
+# The Fleet controller will:
+#   1. Poll the Git repo every 15s for changes on the 'main' branch
+#   2. Render the Helm chart found at 'apps/nginx' with the values below
+#   3. Create one BundleDeployment per matching cluster
+#   4. fleet-agent on each cluster applies the rendered manifests
+# =============================================================================
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: production-app
+  namespace: fleet-default   # Must be fleet-default to target downstream clusters
+  labels:
+    # Labels on the GitRepo itself — useful for filtering with kubectl
+    environment: production
+    team: platform
+spec:
+  # The Git repository to poll. Use HTTPS for public repos.
+  # For private repos, add: clientSecretName: git-credentials
+  repo: https://github.com/rancher/fleet-examples
+
+  # Branch to watch. Use 'branch' for a moving target (follows new commits).
+  # Use 'revision' for a pinned commit SHA (immutable deployments).
+  branch: master
+
+  # How often Fleet polls for Git changes (default: 15s).
+  # Increase for repos with high commit frequency to reduce API rate-limit risk.
+  pollingInterval: 15s
+
+  # Paths within the repo to deploy. Each path is a separate deployment unit.
+  # Fleet detects whether the path contains a Helm chart, kustomization.yaml,
+  # or plain manifests and handles each appropriately.
+  paths:
+    - simple   # Plain YAML manifests (fleet-examples/simple/)
+
+  # Global Helm values — applied to ALL targets unless overridden per-target.
+  # These are merged with target-specific values (target values win on conflict).
+  helm:
+    # releaseName: set a consistent Helm release name across all clusters.
+    # If not set, Fleet generates one from the GitRepo name.
+    releaseName: nginx-production
+
+    # Global values applied to all production clusters
+    values:
+      # These values are illustrative — adjust to match the actual chart
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+  # targets: defines WHICH clusters receive this GitRepo's content.
+  # Fleet evaluates targets in order — FIRST matching target wins for each cluster.
+  targets:
+    # Target 1: US production clusters (higher replicas for primary region)
+    - name: production-us
+      clusterSelector:
+        matchLabels:
+          env: production
+          region: us-west
+      helm:
+        values:
+          replicaCount: 5           # Override global replicaCount for US primary
+          ingress:
+            host: "nginx-us.example.com"
+
+    # Target 2: EU production clusters
+    - name: production-eu
+      clusterSelector:
+        matchLabels:
+          env: production
+          region: eu-central
+      helm:
+        values:
+          replicaCount: 3
+          ingress:
+            host: "nginx-eu.example.com"
+
+    # Target 3: All remaining production clusters (catch-all for production label)
+    # This catches any production cluster not matched by the region-specific targets above.
+    - name: production-default
+      clusterSelector:
+        matchLabels:
+          env: production
+      helm:
+        values:
+          replicaCount: 2
+          ingress:
+            host: "nginx.example.com"
+
+---
+# =============================================================================
+# GitRepo: staging-app
+#
+# Deploys the same application to ALL clusters labelled env=staging,
+# but with reduced resources and a staging-appropriate configuration.
+#
+# Key differences from production-app:
+#   - Lower replica count (1 instead of 3)
+#   - Relaxed resource limits
+#   - Different ingress hostname pattern
+#   - No region-specific overrides needed (staging is a single cluster)
+# =============================================================================
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: staging-app
+  namespace: fleet-default
+  labels:
+    environment: staging
+    team: platform
+spec:
+  repo: https://github.com/rancher/fleet-examples
+  branch: master
+  pollingInterval: 30s   # Poll less frequently for staging (less critical latency)
+
+  paths:
+    - simple
+
+  helm:
+    releaseName: nginx-staging
+    values:
+      # Lower resource footprint for staging clusters
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi"
+
+  targets:
+    # Staging clusters — any cluster labelled env=staging
+    - name: staging
+      clusterSelector:
+        matchLabels:
+          env: staging
+      helm:
+        values:
+          replicaCount: 1
+          ingress:
+            # Staging uses a different hostname convention
+            host: "nginx.staging.example.com"
+          # Enable extra debug logging in staging only
+          env:
+            LOG_LEVEL: "debug"
+
+---
+# =============================================================================
+# GitRepo: edge-app
+#
+# Deploys a lightweight version of the application to the edge-clusters
+# ClusterGroup defined above. Demonstrates using a ClusterGroup reference
+# instead of a raw clusterSelector.
+#
+# Benefit of ClusterGroup: if you add a new cluster to the edge-clusters group
+# (by labelling it tier=edge and region=europe), this GitRepo automatically
+# starts deploying to it — no changes to the GitRepo spec needed.
+# =============================================================================
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: edge-app
+  namespace: fleet-default
+  labels:
+    environment: edge
+    team: platform
+spec:
+  repo: https://github.com/rancher/fleet-examples
+  branch: master
+
+  # Edge clusters may have intermittent connectivity — be more tolerant of
+  # poll failures by increasing the interval
+  pollingInterval: 60s
+
+  paths:
+    - simple
+
+  helm:
+    releaseName: nginx-edge
+    values:
+      # Minimal resource footprint for edge/constrained nodes
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: "25m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+
+  targets:
+    # Target the named ClusterGroup instead of a raw label selector.
+    # This is equivalent to selecting all clusters that satisfy
+    # the ClusterGroup's selector (tier=edge AND region=europe).
+    - name: edge-europe
+      clusterGroup: edge-clusters   # References the ClusterGroup defined above
+      helm:
+        values:
+          replicaCount: 1
+          # Edge-specific environment variable
+          env:
+            DEPLOYMENT_MODE: "edge"
+            MAX_CONNECTIONS: "100"
+
+---
+# =============================================================================
+# VERIFICATION COMMANDS
+# =============================================================================
+# After applying this file, verify with:
+#
+# 1. Check GitRepo status (all three should eventually show READY bundles):
+#    kubectl get gitrepo -n fleet-default
+#
+# 2. Check Bundle objects created from the GitRepos:
+#    kubectl get bundle -n fleet-default
+#
+# 3. Check BundleDeployments (one per GitRepo per target cluster):
+#    kubectl get bundledeployment -n fleet-default
+#
+# 4. Describe a specific GitRepo for detailed status:
+#    kubectl describe gitrepo production-app -n fleet-default
+#
+# 5. Check the ClusterGroup membership:
+#    kubectl describe clustergroup edge-clusters -n fleet-default
+#
+# 6. Check fleet-agent on a downstream cluster:
+#    kubectl -n cattle-fleet-system logs -l app=fleet-agent --tail=50
+#
+# TROUBLESHOOTING
+# ---------------
+# No clusters matched (READY: 0):
+#   - Check cluster labels: kubectl get clusters.fleet.cattle.io -n fleet-default --show-labels
+#   - Add missing label: kubectl label clusters.fleet.cattle.io <name> env=production -n fleet-default
+#
+# Bundle NotReady:
+#   - kubectl describe bundle -n fleet-default <bundle-name>
+#   - Check Status.Conditions for the specific error message
+#
+# fleet-agent not running on downstream cluster:
+#   - kubectl get pods -n cattle-fleet-system --kubeconfig=/path/to/downstream.yaml
+# =============================================================================

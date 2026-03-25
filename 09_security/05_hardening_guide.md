@@ -31,16 +31,16 @@
 Security is a process, not a destination. This lesson covers the layered approach to hardening a k3s cluster: from CIS Benchmark alignment and k3s-specific flags, through OS-level controls, to runtime threat detection. No single control is sufficient — defence-in-depth means assuming each layer will eventually be breached and ensuring the next layer still holds.
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph "Defence in Depth"
-        L1[Layer 1: Image security Scanned, minimal, non-root images]
-        L2[Layer 2: Pod security PSA Restricted, SecurityContext]
-        L3[Layer 3: Network security NetworkPolicies, TLS everywhere]
-        L4[Layer 4: RBAC Least-privilege, no cluster-admin]
-        L5[Layer 5: Secrets security Encryption at rest, Sealed Secrets]
-        L6[Layer 6: Node OS security Firewall, SSH, minimal packages]
-        L7[Layer 7: k3s/API hardening CIS Benchmark, audit logging]
-        L8[Layer 8: Runtime detection Falco, anomaly detection]
+        L1["Layer 1: Image security<br/>Scanned, minimal, non-root images"]
+        L2["Layer 2: Pod security<br/>PSA Restricted, SecurityContext"]
+        L3["Layer 3: Network security<br/>NetworkPolicies, TLS everywhere"]
+        L4["Layer 4: RBAC<br/>Least-privilege, no cluster-admin"]
+        L5["Layer 5: Secrets security<br/>Encryption at rest, Sealed Secrets"]
+        L6["Layer 6: Node OS security<br/>Firewall, SSH, minimal packages"]
+        L7["Layer 7: k3s/API hardening<br/>CIS Benchmark, audit logging"]
+        L8["Layer 8: Runtime detection<br/>Falco, anomaly detection"]
 
         L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> L8
     end
@@ -101,12 +101,19 @@ sudo ./kube-bench --config-dir cfg --config cfg/config.yaml \
 k3s consolidates all components (API server, controller manager, scheduler, kubelet) into a single binary. Flags for each component are passed via `kube-apiserver-arg`, `kube-controller-manager-arg`, `kube-scheduler-arg`, and `kubelet-arg` in `/etc/rancher/k3s/config.yaml`.
 
 ```mermaid
-graph LR
-    CONFIG["/etc/rancher/k3s/config.yaml"] --> K3S[k3s server binary]
-    K3S --> APISERVER[kube-apiserver --kube-apiserver-arg flags]
-    K3S --> CM[kube-controller-manager --kube-controller-manager-arg flags]
-    K3S --> SCH[kube-scheduler --kube-scheduler-arg flags]
-    K3S --> KL[kubelet --kubelet-arg flags]
+flowchart LR
+    CONFIG["/etc/rancher/k3s/config.yaml"]
+    K3S["k3s server binary"]
+    APISERVER["kube-apiserver<br/>(--kube-apiserver-arg flags)"]
+    CM["kube-controller-manager<br/>(--kube-controller-manager-arg flags)"]
+    SCH["kube-scheduler<br/>(--kube-scheduler-arg flags)"]
+    KL["kubelet<br/>(--kubelet-arg flags)"]
+
+    CONFIG --> K3S
+    K3S --> APISERVER
+    K3S --> CM
+    K3S --> SCH
+    K3S --> KL
 ```
 
 ### API Server Hardening
@@ -224,6 +231,22 @@ kubelet-arg:
 
 Audit logging records every request made to the API server — essential for incident response and compliance.
 
+```mermaid
+flowchart LR
+    REQ(["kubectl / API Client"])
+    API["kube-apiserver"]
+    POL["Audit Policy<br/>(rules: level, verb, resource)"]
+    LOG["Audit Log File<br/>/var/log/k3s/audit.log"]
+    SIEM["SIEM / Log Aggregator<br/>(Loki, Splunk, Elastic)"]
+    ALERT["Alert / Dashboard"]
+
+    REQ -->|"request"| API
+    API -->|"evaluate policy"| POL
+    POL -->|"write event"| LOG
+    LOG -->|"ship"| SIEM
+    SIEM --> ALERT
+```
+
 ### Audit policy file
 
 ```yaml
@@ -315,8 +338,11 @@ flowchart TD
         P5[":2379-2380 — etcd (HA multi-server only)"]
     end
 
-    INTERNET([internet]) -->|restrict to trusted IPs| P1
-    NODES([other nodes]) --> P2
+    INTERNET(["internet"])
+    NODES(["other nodes"])
+
+    INTERNET -->|"restrict to trusted IPs only"| P1
+    NODES --> P2
     NODES --> P3
     NODES --> P4
     NODES --> P5
@@ -503,6 +529,27 @@ kubectl config view --raw | grep "name:"
 
 Every container image is a potential attack vector — outdated packages, misconfigured files, embedded secrets. Trivy is the most widely adopted open-source image scanner.
 
+```mermaid
+sequenceDiagram
+    participant DEV as "Developer"
+    participant CI as "CI Pipeline"
+    participant TRIVY as "Trivy Scanner"
+    participant REG as "Container Registry"
+    participant K8S as "k3s Cluster"
+
+    DEV->>CI: "git push (triggers build)"
+    CI->>CI: "docker build myapp:sha"
+    CI->>TRIVY: "trivy image myapp:sha"
+    TRIVY-->>CI: "Scan results (CVEs)"
+    alt "HIGH/CRITICAL found"
+        CI-->>DEV: "Build FAILED — fix CVEs"
+    else "Clean scan"
+        CI->>REG: "docker push myapp:sha"
+        CI->>K8S: "kubectl set image..."
+        K8S-->>DEV: "Deployment updated"
+    end
+```
+
 ```bash
 # Install Trivy
 curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
@@ -586,13 +633,20 @@ RUN --mount=type=secret,id=npm_token \
 While Trivy scans images before deployment, Falco monitors running workloads for suspicious behaviour at runtime — syscall-level threat detection.
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph "Falco Architecture"
-        SC[Linux Kernel syscall events] --> PROBE[Falco eBPF probe or kernel module]
-        PROBE --> FALCO[Falco engine rule evaluation]
-        FALCO -->|alert| SYSLOG[syslog]
-        FALCO -->|alert| STDOUT[stdout/JSON]
-        FALCO -->|alert| FALCOSIDEKICK[Falcosidekick webhooks, Slack, PagerDuty...]
+        SC["Linux Kernel syscall events"]
+        PROBE["Falco eBPF probe<br/>or kernel module"]
+        FALCO["Falco engine<br/>(rule evaluation)"]
+        SYSLOG["syslog"]
+        STDOUT["stdout/JSON"]
+        FALCOSIDEKICK["Falcosidekick<br/>(webhooks, Slack, PagerDuty...)"]
+
+        SC --> PROBE
+        PROBE --> FALCO
+        FALCO -->|"alert"| SYSLOG
+        FALCO -->|"alert"| STDOUT
+        FALCO -->|"alert"| FALCOSIDEKICK
     end
 ```
 

@@ -11,8 +11,10 @@
 - [Installing cert-manager](#installing-cert-manager)
 - [ClusterIssuers: Let's Encrypt Staging and Production](#clusterissuers-lets-encrypt-staging-and-production)
 - [HTTP-01 Challenge](#http-01-challenge)
+- [HTTP-01 Challenge Sequence](#http-01-challenge-sequence)
 - [DNS-01 Challenge](#dns-01-challenge)
 - [Requesting Certificates](#requesting-certificates)
+- [Certificate Lifecycle](#certificate-lifecycle)
 - [Automatic Certificate via Ingress Annotation](#automatic-certificate-via-ingress-annotation)
 - [Automatic Certificate via IngressRoute](#automatic-certificate-via-ingressroute)
 - [Certificate Renewal](#certificate-renewal)
@@ -157,20 +159,40 @@ Requirements:
 - Port 80 must be publicly accessible
 - Traefik must be able to create a temporary `Ingress` for the challenge
 
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## HTTP-01 Challenge Sequence
+
+The HTTP-01 flow involves tight cooperation between cert-manager, Traefik, and the Let's Encrypt ACME server. The entire process typically completes in 30–90 seconds:
+
 ```mermaid
 sequenceDiagram
-    participant CM as cert-manager
-    participant LE as Let's Encrypt
-    participant T as Traefik (:80)
+    participant Dev as "Developer"
+    participant K8S as "Kubernetes API"
+    participant CM as "cert-manager"
+    participant T as "Traefik (:80)"
+    participant LE as "Let's Encrypt ACME"
 
-    CM->>T: Create Ingress for /.well-known/acme-challenge/TOKEN
-    CM->>LE: I'm ready, please verify
-    LE->>T: GET /.well-known/acme-challenge/TOKEN
-    T-->>LE: 200 OK + token
-    LE-->>CM: Challenge passed
-    CM->>T: Delete challenge Ingress
-    LE-->>CM: Certificate issued
+    Dev->>K8S: Apply Ingress with<br/>cert-manager.io/cluster-issuer annotation
+    K8S->>CM: Ingress detected — Certificate needed
+    CM->>LE: POST /acme/new-order (domain: myapp.example.com)
+    LE-->>CM: Order created — HTTP-01 challenge token issued
+    CM->>K8S: Create temporary Ingress for<br/>/.well-known/acme-challenge/TOKEN
+    K8S->>T: New Ingress rule pushed to Traefik
+    CM->>LE: POST /acme/challenge — "I'm ready"
+    LE->>T: GET http://myapp.example.com/.well-known/acme-challenge/TOKEN
+    T-->>LE: 200 OK + token value
+    LE-->>CM: Challenge validated
+    LE-->>CM: Certificate issued (PEM)
+    CM->>K8S: Create Secret (tls.crt + tls.key)
+    CM->>K8S: Delete temporary challenge Ingress
+    Note over K8S: Certificate CR status → Ready<br/>Secret available for Traefik
+    T->>K8S: Mount TLS secret on websecure entrypoint
 ```
+
+If the challenge fails, check: (1) port 80 is open in your firewall, (2) DNS resolves to the correct IP, (3) the temporary Ingress was created (`kubectl get ingress -A` during the challenge). cert-manager retries automatically with exponential backoff.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -288,6 +310,44 @@ spec:
 ```
 
 cert-manager watches for Ingresses with this annotation and automatically creates a `Certificate` resource.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Certificate Lifecycle
+
+Every `Certificate` resource in cert-manager goes through a predictable lifecycle of sub-resources. Understanding each stage helps you pinpoint exactly where a stuck certificate is failing:
+
+```mermaid
+flowchart TD
+    CERT(["Certificate CR created<br/>(spec.dnsNames, issuerRef)"])
+    CR["CertificateRequest created<br/>(contains CSR)"]
+    ORD["Order created<br/>(ACME order for the domain)"]
+    CHAL["Challenge created<br/>(HTTP-01 or DNS-01)"]
+    VAL{"Challenge<br/>validated?"}
+    FAIL(["Challenge failed<br/>retry with backoff"])
+    ISSUE["Certificate issued by CA<br/>(PEM bytes returned)"]
+    SEC["Secret created or updated<br/>(tls.crt + tls.key)"]
+    READY(["Certificate: Ready = True<br/>NotBefore / NotAfter set"])
+    RENEW{"Now > NotAfter<br/>minus renewBefore?"}
+    RENEW_LOOP["New CertificateRequest<br/>created automatically"]
+
+    CERT --> CR --> ORD --> CHAL --> VAL
+    VAL -->|"No"| FAIL
+    FAIL -.->|"retry"| CHAL
+    VAL -->|"Yes"| ISSUE --> SEC --> READY
+    READY --> RENEW
+    RENEW -->|"Yes — renew now"| RENEW_LOOP
+    RENEW_LOOP --> CR
+    RENEW -->|"No — check again later"| READY
+
+    style READY fill:#22c55e,color:#fff
+    style FAIL fill:#fee2e2,color:#ef4444
+    style RENEW_LOOP fill:#fef9c3,color:#854d0e
+```
+
+The default `renewBefore` is 30 days before expiry (Let's Encrypt certificates expire after 90 days, so renewal triggers at day 60). cert-manager continuously monitors all `Certificate` resources and schedules renewal jobs automatically — no cron jobs or external tooling needed.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

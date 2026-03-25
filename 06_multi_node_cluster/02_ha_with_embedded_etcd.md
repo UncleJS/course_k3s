@@ -11,6 +11,8 @@
 - [HA Requirements](#ha-requirements)
 - [Bootstrapping the First Server](#bootstrapping-the-first-server)
 - [Joining Additional Server Nodes](#joining-additional-server-nodes)
+- [HA Bootstrap Sequence](#ha-bootstrap-sequence)
+- [Raft Quorum Reference](#raft-quorum-reference)
 - [The Fixed Registration Address](#the-fixed-registration-address)
 - [Cluster State and etcd Health](#cluster-state-and-etcd-health)
 - [Leader Election and Failover](#leader-election-and-failover)
@@ -116,6 +118,75 @@ Verify all servers joined:
 kubectl get nodes
 # All three should show ROLES: control-plane,master
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## HA Bootstrap Sequence
+
+The bootstrap order matters — the first server with `--cluster-init` creates the etcd cluster, and all subsequent servers join it. Agents should only be added after etcd quorum is established:
+
+```mermaid
+sequenceDiagram
+    participant S1 as "server-01"
+    participant S2 as "server-02"
+    participant S3 as "server-03"
+    participant ETCD as "etcd Cluster"
+    participant A1 as "agent-01"
+    participant A2 as "agent-02"
+
+    S1->>ETCD: k3s server --cluster-init<br/>(creates new etcd cluster)
+    Note over ETCD: Single-member cluster<br/>No quorum yet (1/1)
+    S2->>S1: k3s server --server https://S1:6443<br/>--token TOKEN
+    S1->>ETCD: Add S2 as etcd member
+    Note over ETCD: 2-member cluster<br/>Still no tolerance for failure
+    S3->>S1: k3s server --server https://S1:6443<br/>--token TOKEN
+    S1->>ETCD: Add S3 as etcd member
+    Note over ETCD: 3-member cluster<br/>Quorum = 2, can lose 1 node
+    ETCD-->>S1: Cluster healthy
+    ETCD-->>S2: Cluster healthy
+    ETCD-->>S3: Cluster healthy
+    A1->>S1: k3s agent --server https://LB:6443
+    A2->>S2: k3s agent --server https://LB:6443
+    Note over A1,A2: Agents point to LB,<br/>not individual servers
+```
+
+The critical sequence constraint: never bootstrap server-02 and server-03 simultaneously. Join them one at a time, waiting for each to reach `Ready` state before adding the next. Racing joins can corrupt the etcd member list.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Raft Quorum Reference
+
+Raft requires a strict majority of members to be available to accept writes. This is why cluster size must be odd — even-sized clusters gain no additional fault tolerance over the next smaller odd size.
+
+```mermaid
+graph LR
+    subgraph "1 Server"
+        N1["1 node"] -->|"quorum = 1"| Q1["Can lose: 0<br/>No HA"]
+    end
+
+    subgraph "3 Servers"
+        N3["3 nodes"] -->|"quorum = 2"| Q3["Can lose: 1<br/>Standard HA"]
+    end
+
+    subgraph "5 Servers"
+        N5["5 nodes"] -->|"quorum = 3"| Q5["Can lose: 2<br/>Stronger HA"]
+    end
+
+    subgraph "2 or 4 Servers — avoid"
+        NE["2 or 4 nodes"] -->|"same quorum as<br/>next smaller odd"| QE["No extra fault tolerance<br/>vs fewer nodes"]
+    end
+
+    style Q1 fill:#fee2e2,color:#ef4444
+    style Q3 fill:#fef9c3,color:#854d0e
+    style Q5 fill:#dcfce7,color:#166534
+    style QE fill:#fee2e2,color:#ef4444
+```
+
+For most k3s HA deployments, 3 server nodes is the right choice. Five servers are warranted only when you need the ability to survive 2 simultaneous server failures — typically in very large or mission-critical production clusters. The overhead of 5 servers (double the API server resources, more etcd write latency) rarely justifies the gain for small teams.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

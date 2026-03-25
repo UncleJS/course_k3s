@@ -34,6 +34,31 @@ This lesson translates a realistic Docker Compose file (web app + PostgreSQL + R
 
 > **If you have already read Module 16 Lesson 02**, many translation steps are the same. This lesson focuses on **Docker-specific** fields and the Docker toolchain (Buildx, Docker Hub, Kompose with Docker Compose input). Skip to the Docker-specific sections if you want the deltas only.
 
+```mermaid
+flowchart LR
+    subgraph "Docker Compose"
+        S1["service: web<br/>(build + ports + env)"]
+        S2["service: db<br/>(postgres + volumes)"]
+        S3["service: redis"]
+        SEC["secrets: db_pass"]
+        CFG["configs: nginx.conf"]
+    end
+
+    subgraph "Kubernetes / k3s"
+        D1["Deployment: web<br/>+ Service + Ingress"]
+        SS1["StatefulSet: db<br/>+ PVC + Service"]
+        D3["Deployment: redis<br/>+ Service"]
+        K8S_SEC["Secret: db-credentials"]
+        K8S_CM["ConfigMap: nginx-conf"]
+    end
+
+    S1 -->|"translate"| D1
+    S2 -->|"translate"| SS1
+    S3 -->|"translate"| D3
+    SEC -->|"translate"| K8S_SEC
+    CFG -->|"translate"| K8S_CM
+```
+
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
@@ -254,6 +279,28 @@ spec:
 
 > **Kubernetes ignores `deploy:` entirely** when used with `docker-compose up`. It is a Swarm-only field. Kompose reads it and partially translates it — always verify the output.
 
+```mermaid
+flowchart LR
+    DC["docker compose<br/>deploy: block"]
+    RS["Swarm<br/>(ignored in plain Compose)"]
+    K8S["Kubernetes"]
+
+    DC --> RS
+    DC -->|"Kompose translates"| K8S
+
+    subgraph "deploy: → Kubernetes mappings"
+        R["replicas: 2<br/>→ spec.replicas: 2"]
+        CPU["resources.limits.cpus: 0.5<br/>→ resources.limits.cpu: 500m"]
+        MEM["resources.limits.memory: 512M<br/>→ resources.limits.memory: 512Mi"]
+        UP["update_config.parallelism: 1<br/>→ rollingUpdate.maxUnavailable: 0"]
+    end
+
+    K8S --> R
+    K8S --> CPU
+    K8S --> MEM
+    K8S --> UP
+```
+
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
 ---
@@ -276,6 +323,18 @@ spec:
   - port: 3000
     targetPort: 3000
     protocol: TCP
+```
+
+```mermaid
+flowchart TD
+    C(["Client"])
+    ING["Traefik IngressRoute<br/>(HTTPS / :443)"]
+    SVC["ClusterIP Service<br/>port: 3000"]
+    POD["Pod: web<br/>containerPort: 3000"]
+
+    C -->|"taskr.example.com"| ING
+    ING -->|"cluster-internal"| SVC
+    SVC -->|"round-robin"| POD
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -390,6 +449,23 @@ env:
 ```
 
 > **Which option to choose:** If your application reads `/run/secrets/db_password` as a file (common pattern in Docker Swarm apps), use Option A. If it reads `$DB_PASSWORD` as an environment variable (more common), use Option B. Either way, never hardcode values in the manifest.
+
+```mermaid
+flowchart LR
+    DS["Docker Compose<br/>secrets: db_password<br/>(external: true)"]
+    SW["Docker Swarm<br/>secret store"]
+    DC_MNT["/run/secrets/db_password<br/>(inside container)"]
+
+    K8S_SEC["Kubernetes Secret<br/>taskr-secrets"]
+    OPT_A["Option A: Volume Mount<br/>/run/secrets/db_password"]
+    OPT_B["Option B: Env Var<br/>$DB_PASSWORD"]
+
+    DS --> SW --> DC_MNT
+
+    DS -->|"translate to"| K8S_SEC
+    K8S_SEC --> OPT_A
+    K8S_SEC --> OPT_B
+```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -559,6 +635,25 @@ initContainers:
 - name: wait-for-postgres
   image: busybox:1.36
   command: ['sh', '-c', 'until nc -z postgres 5432; do sleep 2; done']
+```
+
+```mermaid
+sequenceDiagram
+    participant K as "Kubernetes"
+    participant IC as "Init Container:<br/>wait-for-postgres"
+    participant DB as "postgres Pod"
+    participant WEB as "web Container"
+
+    K->>IC: "Start init container"
+    loop "Until DB ready"
+        IC->>DB: "nc -z postgres 5432"
+        DB-->>IC: "Connection refused"
+        IC->>IC: "sleep 2"
+    end
+    DB-->>IC: "Connection accepted"
+    IC-->>K: "Init container exits 0"
+    K->>WEB: "Start web container"
+    Note over WEB: "DB is guaranteed ready"
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)

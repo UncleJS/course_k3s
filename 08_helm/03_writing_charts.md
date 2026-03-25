@@ -11,12 +11,14 @@
 - [Chart.yaml](#chartyaml)
 - [values.yaml](#valuesyaml)
 - [Templates and Go Templating](#templates-and-go-templating)
+- [Template Rendering Pipeline](#template-rendering-pipeline)
 - [Built-in Objects](#built-in-objects)
 - [Template Functions and Pipelines](#template-functions-and-pipelines)
 - [Named Templates with _helpers.tpl](#named-templates-with-_helperstpl)
 - [Conditional Logic and Loops](#conditional-logic-and-loops)
 - [NOTES.txt](#notestxt)
 - [Chart Dependencies](#chart-dependencies)
+- [Chart Versioning and Dependencies](#chart-versioning-and-dependencies)
 - [Testing Charts](#testing-charts)
 - [Packaging and Publishing](#packaging-and-publishing)
 - [Lab](#lab)
@@ -174,6 +176,38 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Template Rendering Pipeline
+
+Helm's template rendering is a multi-stage pipeline. Values from multiple sources are merged before being passed to the Go template engine, which produces the final Kubernetes manifests:
+
+```mermaid
+graph LR
+    CY["Chart.yaml<br/>(name, version,<br/>appVersion)"]
+    VY["values.yaml<br/>(chart defaults)"]
+    UV["User values<br/>(--values file<br/>+ --set flags)"]
+    TM["templates/<br/>(Go template files)"]
+    TE["Go Template Engine<br/>(+ Sprig functions)"]
+    RM["Rendered YAML<br/>manifests"]
+    KA["kubectl apply<br/>to Kubernetes API"]
+
+    CY --> TE
+    VY -->|"base values"| MERGE["Merge Layer"]
+    UV -->|"overrides"| MERGE
+    MERGE --> TE
+    TM --> TE
+    TE --> RM --> KA
+
+    style TE fill:#6366f1,color:#fff
+    style MERGE fill:#f59e0b,color:#fff
+    style RM fill:#22c55e,color:#fff
+```
+
+The merge layer applies values in strict precedence order: chart defaults (`values.yaml`) < user values file (`--values`) < `--set` flags. The `--set` flags always win. This means you can ship sensible defaults in `values.yaml`, allow operators to customise via a values file, and allow CI pipelines to inject final overrides via `--set` without modifying any files.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -383,6 +417,41 @@ helm dependency update mychart
 # List dependencies
 helm dependency list mychart
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Chart Versioning and Dependencies
+
+Chart versioning follows semver and separates two concerns: the chart's own version (template changes) and the application version being packaged. Getting this right matters when publishing charts to a registry or sharing with a team:
+
+```mermaid
+flowchart TD
+    CY["Chart.yaml<br/>version: 0.2.0 (chart semver)<br/>appVersion: 2.1.4 (app semver)"]
+
+    DEP["dependencies:<br/>- postgresql 12.x.x<br/>- redis 17.x.x"]
+
+    CY --> DEP
+    DEP -->|"helm dependency update"| LOCK["Chart.lock<br/>(pinned exact versions<br/>+ checksums)"]
+    LOCK -->|"helm dependency build"| CHARTSDIR["charts/<br/>postgresql-12.5.0.tgz<br/>redis-17.3.1.tgz"]
+
+    CHARTSDIR --> RENDER["helm template / install<br/>renders parent + sub-charts"]
+
+    NOTE1["Bump chart version when:<br/>- templates change<br/>- default values change<br/>- dependencies change"]
+    NOTE2["Bump appVersion when:<br/>- the packaged app<br/>  releases a new version"]
+
+    CY -.-> NOTE1
+    CY -.-> NOTE2
+
+    style CY fill:#6366f1,color:#fff
+    style LOCK fill:#f59e0b,color:#fff
+    style CHARTSDIR fill:#22c55e,color:#fff
+```
+
+`Chart.lock` should be committed to version control — it guarantees reproducible builds by pinning sub-chart versions and their checksums. Running `helm dependency update` regenerates `Chart.lock` from the `dependencies` spec and downloads fresh archives. Running `helm dependency build` (faster) downloads exactly what `Chart.lock` specifies without re-resolving versions.
+
+When you increment `version` in `Chart.yaml`, Helm treats the next `helm upgrade` as a new chart version, and that revision appears in `helm history`. When you only increment `appVersion`, the chart revision counter still increments on upgrade, but users can see the app version change in `helm list`.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

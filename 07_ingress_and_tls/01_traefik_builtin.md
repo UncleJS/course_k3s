@@ -10,6 +10,8 @@
 - [What is an Ingress Controller?](#what-is-an-ingress-controller)
 - [Traefik in k3s](#traefik-in-k3s)
 - [Traefik Architecture](#traefik-architecture)
+- [Traefik Request Routing Flow](#traefik-request-routing-flow)
+- [TLS Termination Sequence](#tls-termination-sequence)
 - [Verifying Traefik is Running](#verifying-traefik-is-running)
 - [The Traefik Dashboard](#the-traefik-dashboard)
 - [Traefik Configuration in k3s](#traefik-configuration-in-k3s)
@@ -90,6 +92,74 @@ Key concepts:
 | **Service** | Forwards traffic to backend pods |
 | **IngressRoute** | Traefik-native CRD for full feature access |
 | **Ingress** | Standard Kubernetes Ingress (limited features) |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Traefik Request Routing Flow
+
+Understanding the exact path a request takes through Traefik helps you configure routers and troubleshoot routing failures:
+
+```mermaid
+flowchart LR
+    CLIENT["Client<br/>(browser / API caller)"]
+
+    subgraph "Traefik (kube-system)"
+        EP80["EntryPoint<br/>:80 web"]
+        EP443["EntryPoint<br/>:443 websecure"]
+        RTR["Router<br/>(matches Host header<br/>and PathPrefix rules)"]
+        MW["Middleware<br/>(optional:<br/>redirect, auth,<br/>rate-limit, headers)"]
+        SVC["Traefik Service<br/>(load-balances<br/>across pod IPs)"]
+    end
+
+    subgraph "Backend Pods"
+        POD1["Pod 1"]
+        POD2["Pod 2"]
+        POD3["Pod 3"]
+    end
+
+    CLIENT -->|"HTTP :80"| EP80
+    CLIENT -->|"HTTPS :443"| EP443
+    EP80 --> RTR
+    EP443 --> RTR
+    RTR -->|"rule matched"| MW
+    RTR -.->|"no rule match<br/>404"| CLIENT
+    MW --> SVC
+    SVC --> POD1 & POD2 & POD3
+```
+
+Traefik evaluates routers in **priority order** — higher-priority routers are checked first. When using standard `Ingress` resources, Traefik auto-generates routers from the `spec.rules`. When using `IngressRoute` CRDs, you define routers directly with full access to all Traefik features (match expressions, middleware chains, priority settings).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## TLS Termination Sequence
+
+Traefik handles TLS termination at the EntryPoint level, meaning your backend pods only ever receive plain HTTP connections. Here is the full sequence for an HTTPS request:
+
+```mermaid
+sequenceDiagram
+    participant C as "Client"
+    participant T as "Traefik (:443)"
+    participant MW as "Middleware (optional)"
+    participant POD as "Backend Pod (:8080)"
+
+    C->>T: TLS ClientHello (SNI: myapp.example.com)
+    T->>T: Lookup TLS secret for myapp.example.com
+    T-->>C: TLS ServerHello + certificate
+    Note over C,T: TLS handshake complete<br/>Encrypted tunnel established
+    C->>T: HTTP GET /api/data (inside TLS tunnel)
+    T->>T: Router matches Host(myapp.example.com)
+    T->>MW: Apply middleware (e.g., add headers)
+    MW->>POD: Plain HTTP GET /api/data
+    POD-->>MW: HTTP 200 response
+    MW-->>T: Response (headers modified)
+    T-->>C: HTTP 200 (re-encrypted inside TLS tunnel)
+```
+
+For **TLS passthrough** (when you want the pod to handle TLS itself), configure the `IngressRoute` with `tls.passthrough: true`. In this mode, Traefik forwards the raw TCP bytes without decryption — the pod receives the TLS handshake directly. This is required for mutual TLS (mTLS) scenarios where the pod needs to inspect the client certificate.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -8,6 +8,9 @@
 ## Table of Contents
 - [Overview](#overview)
 - [GitHub Actions Architecture](#github-actions-architecture)
+- [Full Pipeline Flow](#full-pipeline-flow)
+- [Deploy-to-k3s Sequence](#deploy-to-k3s-sequence)
+- [Runner Options for k3s](#runner-options-for-k3s)
 - [Setting Up the KUBECONFIG Secret](#setting-up-the-kubeconfig-secret)
 - [Building and Pushing to GHCR](#building-and-pushing-to-ghcr)
 - [Deploying to k3s with kubectl and Helm](#deploying-to-k3s-with-kubectl-and-helm)
@@ -32,25 +35,25 @@ GitHub Actions is a CI/CD platform built into GitHub. Workflows are YAML files s
 ```mermaid
 flowchart TD
     subgraph GitHub
-        REPO[(Repository .github/workflows/)] -->|on: push| EVENT[Workflow trigger event]
-        EVENT --> QUEUE[Job queue]
+        REPO[("Repository<br/>.github/workflows/")] -->|"on: push"| EVENT["Workflow trigger event"]
+        EVENT --> QUEUE["Job queue"]
     end
 
-    subgraph Runner["GitHub-Hosted Runner (ubuntu-latest)"]
-        QUEUE --> JOB1[Job: test Run unit tests]
-        JOB1 -->|needs: test| JOB2[Job: build Docker build + push to GHCR]
-        JOB2 -->|needs: build| JOB3[Job: deploy Helm upgrade → k3s]
-        JOB3 --> JOB4[Job: notify Slack / GitHub status]
+    subgraph "GitHub-Hosted Runner (ubuntu-latest)"
+        QUEUE --> JOB1["Job: test<br/>Run unit tests"]
+        JOB1 -->|"needs: test"| JOB2["Job: build<br/>Docker build + push to GHCR"]
+        JOB2 -->|"needs: build"| JOB3["Job: deploy<br/>Helm upgrade → k3s"]
+        JOB3 --> JOB4["Job: notify<br/>Slack / GitHub status"]
     end
 
-    subgraph Cluster["k3s Cluster"]
-        JOB3 -->|kubectl / helm via KUBECONFIG secret| K3S[k3s API Server]
-        K3S --> DEPLOY[Updated Deployment]
+    subgraph "k3s Cluster"
+        JOB3 -->|"kubectl / helm via KUBECONFIG secret"| K3S["k3s API Server"]
+        K3S --> DEPLOY["Updated Deployment"]
     end
 
     subgraph Registry
-        JOB2 -->|docker push| GHCR[(GHCR ghcr.io)]
-        GHCR -->|imagePullSecrets| DEPLOY
+        JOB2 -->|"docker push"| GHCR[("GHCR<br/>ghcr.io")]
+        GHCR -->|"imagePullSecrets"| DEPLOY
     end
 ```
 
@@ -66,6 +69,188 @@ flowchart TD
 | **Runner** | The machine that executes jobs |
 | **Secret** | Encrypted key/value stored at repo or org level |
 | **Environment** | A deployment target with optional protection rules |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Full Pipeline Flow
+
+The architecture diagram above shows infrastructure relationships; this diagram shows the **temporal flow** — what happens in order during a typical production deploy, including failure paths.
+
+```mermaid
+flowchart LR
+    PUSH["Code push<br/>to main branch"]
+    TRIGGER["Workflow trigger<br/>on: push branches: main"]
+    TEST["test job<br/>unit + integration tests"]
+    TEST_FAIL{{"tests pass?"}}
+    BUILD["build job<br/>docker build + push to GHCR"]
+    BUILD_FAIL{{"build success?"}}
+    DEPLOY["deploy job<br/>helm upgrade --install"]
+    ROLLOUT["rollout status<br/>kubectl rollout status --timeout=5m"]
+    ROLLOUT_OK{{"rollout healthy?"}}
+    NOTIFY_OK["notify job<br/>Slack: deployment succeeded"]
+    NOTIFY_FAIL["notify job<br/>Slack: deployment FAILED"]
+    CANCEL["workflow cancelled<br/>no deploy"]
+
+    PUSH --> TRIGGER
+    TRIGGER --> TEST
+    TEST --> TEST_FAIL
+    TEST_FAIL -->|"yes"| BUILD
+    TEST_FAIL -->|"no"| CANCEL
+    BUILD --> BUILD_FAIL
+    BUILD_FAIL -->|"yes"| DEPLOY
+    BUILD_FAIL -->|"no"| CANCEL
+    DEPLOY --> ROLLOUT
+    ROLLOUT --> ROLLOUT_OK
+    ROLLOUT_OK -->|"yes"| NOTIFY_OK
+    ROLLOUT_OK -->|"no — helm --atomic rolls back"| NOTIFY_FAIL
+
+    style NOTIFY_OK fill:#16a34a,color:#fff
+    style NOTIFY_FAIL fill:#dc2626,color:#fff
+    style CANCEL fill:#6b7280,color:#fff
+```
+
+The `--atomic` flag on `helm upgrade` is critical for production pipelines: if the rollout fails its health checks within the timeout, Helm automatically rolls back to the previous release and the job exits with a non-zero status. This guarantees the deploy job only succeeds when the new version is actually healthy.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Deploy-to-k3s Sequence
+
+The deploy step is where most pipeline issues originate. Understanding the exact sequence of operations — and which component is responsible at each stage — accelerates debugging.
+
+```mermaid
+sequenceDiagram
+    participant GHA as "GitHub Actions Runner"
+    participant GHCR as "GHCR (ghcr.io)"
+    participant K3S as "k3s API Server"
+    participant HELM as "Helm (on runner)"
+    participant DEP as "Deployment Controller"
+    participant SLACK as "Slack Webhook"
+
+    Note over GHA: deploy job starts after build job succeeds
+
+    GHA->>GHA: decode KUBECONFIG_BASE64 secret
+    GHA->>GHA: write ~/.kube/config (chmod 600)
+
+    GHA->>K3S: kubectl cluster-info (connectivity check)
+    K3S-->>GHA: cluster reachable
+
+    GHA->>HELM: helm upgrade --install my-app<br/>--set image.tag=<sha><br/>--atomic --timeout 5m --wait
+
+    HELM->>K3S: get current release state
+    K3S-->>HELM: current release manifest
+
+    HELM->>K3S: apply new manifests<br/>(Deployment with new image tag)
+    K3S->>DEP: trigger rollout
+
+    loop Pod readiness check (--wait)
+        DEP->>GHCR: pull new image
+        GHCR-->>DEP: image layers
+        DEP-->>K3S: pod Running + Ready
+        K3S-->>HELM: availableReplicas updated
+    end
+
+    alt rollout succeeds within timeout
+        HELM-->>GHA: exit 0 (success)
+        GHA->>SLACK: POST deployment succeeded
+    else rollout fails (CrashLoopBackOff, timeout, etc.)
+        HELM->>K3S: helm rollback (--atomic)
+        K3S-->>DEP: restore previous Deployment
+        HELM-->>GHA: exit 1 (failure)
+        GHA->>SLACK: POST deployment FAILED — rolled back
+    end
+```
+
+Three things to note in this sequence:
+
+1. **Connectivity check first** — a quick `kubectl cluster-info` before the Helm command gives you a clear error message if the KUBECONFIG is wrong or the cluster is unreachable, rather than a confusing Helm timeout.
+2. **`--wait` vs `--atomic`** — `--wait` blocks until pods are ready; `--atomic` adds automatic rollback on failure. Always use both in production pipelines.
+3. **Image pull happens on the node**, not the runner — if the GHCR image is private, the cluster needs an `imagePullSecret` with GHCR credentials, not just the runner's `GITHUB_TOKEN`.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Runner Options for k3s
+
+Choosing the right runner type for k3s deployments involves trade-offs between cost, network access, and maintenance overhead.
+
+```mermaid
+graph TD
+    ROOT{{"Which runner<br/>for k3s deploys?"}}
+
+    GH["GitHub-Hosted Runner<br/>(ubuntu-latest)"]
+    SH["Self-Hosted Runner<br/>(runs on your infra)"]
+
+    GH_PROS["Pros:<br/>• Zero maintenance<br/>• Fresh environment per job<br/>• Built-in secrets isolation<br/>• Free for public repos"]
+    GH_CONS["Cons:<br/>• k3s must be internet-accessible<br/>• Network egress charges<br/>• 6h job timeout<br/>• Slower cold starts"]
+
+    GH_EXPOSE["k3s exposure options:<br/>A) Public IP + firewall rules<br/>B) Tailscale / WireGuard VPN<br/>C) Cloudflare Tunnel (no public port)"]
+
+    SH_PROS["Pros:<br/>• Private network access to k3s<br/>• Faster (no cold start)<br/>• Persistent caches (Docker layers)<br/>• No egress charges"]
+    SH_CONS["Cons:<br/>• You maintain the runner VM<br/>• Security: runner has cluster access<br/>• Must handle runner updates<br/>• Shared state between runs"]
+
+    SH_WHERE["Where to run self-hosted:<br/>A) VM on same network as k3s<br/>B) Pod inside k3s itself<br/>C) Raspberry Pi / homelab node"]
+
+    ROOT -->|"k3s is internet-accessible<br/>or simple setup"| GH
+    ROOT -->|"k3s is private / on-prem<br/>or high build frequency"| SH
+
+    GH --> GH_PROS
+    GH --> GH_CONS
+    GH_CONS --> GH_EXPOSE
+
+    SH --> SH_PROS
+    SH --> SH_CONS
+    SH_CONS --> SH_WHERE
+
+    style GH fill:#1d4ed8,color:#fff
+    style SH fill:#0f766e,color:#fff
+```
+
+### Installing a self-hosted runner on k3s
+
+The cleanest approach for a private k3s cluster is to run the GitHub Actions runner as a Pod using the `actions-runner-controller` (ARC):
+
+```bash
+# Install ARC via Helm
+helm repo add actions-runner-controller \
+  https://actions-runner-controller.github.io/actions-runner-controller
+helm install arc actions-runner-controller/actions-runner-controller \
+  --namespace actions-runner-system \
+  --create-namespace \
+  --set authSecret.create=true \
+  --set authSecret.github_token="${GITHUB_TOKEN}"
+
+# Create a RunnerDeployment in your org/repo
+kubectl apply -f - <<'EOF'
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: k3s-runner
+  namespace: actions-runner-system
+spec:
+  replicas: 2
+  template:
+    spec:
+      repository: my-org/my-repo
+      labels:
+        - self-hosted
+        - k3s
+EOF
+```
+
+Then in your workflow, target the self-hosted runner:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: [self-hosted, k3s]
+```
+
+The runner pod already has in-cluster access to the k3s API server — no KUBECONFIG secret needed. Use a properly scoped ServiceAccount instead (see the RBAC section in Lesson 01).
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

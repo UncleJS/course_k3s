@@ -9,10 +9,12 @@
 - [Overview](#overview)
 - [What is Helm?](#what-is-helm)
 - [Core Concepts](#core-concepts)
+- [Helm Chart Structure](#helm-chart-structure)
 - [Installing Helm](#installing-helm)
 - [Helm Repositories](#helm-repositories)
 - [Finding Charts](#finding-charts)
 - [Installing a Chart](#installing-a-chart)
+- [Helm Install Sequence](#helm-install-sequence)
 - [Inspecting Releases](#inspecting-releases)
 - [Upgrading and Rolling Back](#upgrading-and-rolling-back)
 - [Uninstalling Releases](#uninstalling-releases)
@@ -61,6 +63,42 @@ Helm v3 (current) runs entirely client-side — no Tiller server needed.
 | **Values** | Configuration that customises a chart installation |
 | **Revision** | A numbered snapshot of a release (for rollback) |
 | **Template** | A Go-template YAML file that renders to Kubernetes manifests |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Helm Chart Structure
+
+A Helm chart is a directory tree with a specific layout. Every file has a defined role, and Helm processes them in a specific order during rendering:
+
+```mermaid
+flowchart TD
+    ROOT["mychart/"]
+
+    ROOT --> CY["Chart.yaml<br/>(name, version, appVersion,<br/>description, dependencies)"]
+    ROOT --> VY["values.yaml<br/>(default configuration<br/>for all templates)"]
+    ROOT --> CHARTS["charts/<br/>(downloaded sub-chart .tgz files<br/>from helm dependency update)"]
+    ROOT --> TMPL["templates/"]
+    ROOT --> IGNORE[".helmignore<br/>(exclude files from package)"]
+
+    TMPL --> DEP["deployment.yaml"]
+    TMPL --> SVC["service.yaml"]
+    TMPL --> ING["ingress.yaml"]
+    TMPL --> CM["configmap.yaml"]
+    TMPL --> HPA["hpa.yaml"]
+    TMPL --> SA["serviceaccount.yaml"]
+    TMPL --> HLP["_helpers.tpl<br/>(named template definitions<br/>— not rendered directly)"]
+    TMPL --> NOTES["NOTES.txt<br/>(post-install message<br/>— printed to stdout)"]
+
+    style ROOT fill:#6366f1,color:#fff
+    style CY fill:#f59e0b,color:#fff
+    style VY fill:#f59e0b,color:#fff
+    style HLP fill:#22c55e,color:#fff
+    style NOTES fill:#22c55e,color:#fff
+```
+
+Files whose names begin with `_` (like `_helpers.tpl`) are never rendered directly as Kubernetes manifests. They serve as a library of named templates that other templates can call via `{{ include "chart.name" . }}`. The `NOTES.txt` file is special — it is rendered and printed to the terminal after a successful `helm install` or `helm upgrade`, giving users connection instructions and next steps.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -240,6 +278,40 @@ stateDiagram-v2
     Revision3 --> Revision2 : helm rollback
     Revision2 --> [*] : helm uninstall
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Helm Install Sequence
+
+When you run `helm install`, Helm executes several steps before any Kubernetes resources are created. Understanding the sequence helps you debug failed installs and understand what the `--dry-run` flag skips:
+
+```mermaid
+sequenceDiagram
+    participant U as "User"
+    participant H as "Helm CLI"
+    participant CR as "Chart + values.yaml"
+    participant OV as "User --values / --set"
+    participant TE as "Go Template Engine"
+    participant KA as "Kubernetes API"
+    participant SEC as "Secret (release store)"
+
+    U->>H: helm install my-release bitnami/nginx --values my-values.yaml
+    H->>CR: Load chart (download from repo if needed)
+    H->>OV: Merge user values over chart defaults
+    Note over H,OV: Merge order: chart defaults<br/>→ values file → --set flags
+    H->>TE: Render all templates with merged values
+    TE-->>H: Rendered YAML manifests
+    H->>H: Validate rendered YAML (schema check)
+    H->>KA: POST/PUT rendered manifests via kubectl apply logic
+    KA-->>H: Resources created OK
+    H->>SEC: Store release metadata as Secret<br/>(sh.helm.release.v1.my-release.v1)
+    SEC-->>H: Release recorded (revision 1)
+    H-->>U: STATUS: deployed<br/>NOTES printed to terminal
+```
+
+Helm stores each release as a Kubernetes `Secret` in the same namespace as the release. This is how `helm rollback` works — it reads the previous revision's Secret, re-renders the manifests from that snapshot, and applies them. The Secret is also why `helm list` works from any machine with cluster access, without needing local state.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -8,6 +8,9 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Flux v2 Architecture](#flux-v2-architecture)
+- [Flux Component CRD Map](#flux-component-crd-map)
+- [Bootstrap Sequence](#bootstrap-sequence)
+- [GitRepository to Kustomization Chain](#gitrepository-to-kustomization-chain)
 - [Installing the Flux CLI](#installing-the-flux-cli)
 - [Bootstrapping with GitHub](#bootstrapping-with-github)
 - [Bootstrapping with GitLab](#bootstrapping-with-gitlab)
@@ -30,25 +33,25 @@ Flux v2 is a set of CNCF-graduated GitOps controllers for Kubernetes. Unlike Flu
 
 ```mermaid
 graph TD
-    subgraph GitSources["Source Layer"]
-        GR[GitRepository git clone + watch]
-        HR_SRC[HelmRepository fetch index.yaml]
-        OCIRepo[OCIRepository fetch OCI artifact]
-        Bucket[Bucket S3 / GCS source]
+    subgraph "Source Layer"
+        GR["GitRepository<br/>git clone + watch"]
+        HR_SRC["HelmRepository<br/>fetch index.yaml"]
+        OCIRepo["OCIRepository<br/>fetch OCI artifact"]
+        Bucket["Bucket<br/>S3 / GCS source"]
     end
 
-    subgraph Controllers["Flux Controllers"]
-        SC[source-controller fetches + archives sources]
-        KC[kustomize-controller applies Kustomizations]
-        HC[helm-controller manages HelmReleases]
-        NC[notification-controller sends alerts + receives webhooks]
-        IC[image-reflector-controller scans container registries]
-        IAC[image-automation-controller commits image tag updates]
+    subgraph "Flux Controllers"
+        SC["source-controller<br/>fetches + archives sources"]
+        KC["kustomize-controller<br/>applies Kustomizations"]
+        HC["helm-controller<br/>manages HelmReleases"]
+        NC["notification-controller<br/>sends alerts + receives webhooks"]
+        IC["image-reflector-controller<br/>scans container registries"]
+        IAC["image-automation-controller<br/>commits image tag updates"]
     end
 
-    subgraph Outputs["Applied to Cluster"]
-        K8S[Kubernetes Resources]
-        HR_REL[Helm Releases]
+    subgraph "Applied to Cluster"
+        K8S["Kubernetes Resources"]
+        HR_REL["Helm Releases"]
     end
 
     GR --> SC
@@ -59,12 +62,12 @@ graph TD
     SC -->|artifact| KC
     SC -->|artifact| HC
 
-    KC -->|kubectl apply| K8S
-    HC -->|helm upgrade --install| HR_REL
+    KC -->|"kubectl apply"| K8S
+    HC -->|"helm upgrade --install"| HR_REL
 
-    NC -->|webhook trigger| SC
-    IC -->|image tags| IAC
-    IAC -->|git commit| GR
+    NC -->|"webhook trigger"| SC
+    IC -->|"image tags"| IAC
+    IAC -->|"git commit"| GR
 
     style SC fill:#6366f1,color:#fff
     style KC fill:#6366f1,color:#fff
@@ -82,6 +85,141 @@ graph TD
 | **notification-controller** | `notification.toolkit.fluxcd.io` | Sends alerts (Slack, GitHub status) and receives webhooks for immediate reconciliation |
 | **image-reflector-controller** | `image.toolkit.fluxcd.io` | Scans container registries and reflects tag lists into `ImageRepository` objects |
 | **image-automation-controller** | `image.toolkit.fluxcd.io` | Updates image tags in Git based on `ImagePolicy` rules |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Flux Component CRD Map
+
+Each Flux controller owns a set of CRDs. Understanding which controller is responsible for which custom resource helps you know where to look when something goes wrong.
+
+```mermaid
+flowchart TD
+    subgraph "source-controller"
+        SC_CRDS["GitRepository<br/>HelmRepository<br/>OCIRepository<br/>Bucket<br/>HelmChart"]
+    end
+
+    subgraph "kustomize-controller"
+        KC_CRDS["Kustomization"]
+    end
+
+    subgraph "helm-controller"
+        HC_CRDS["HelmRelease"]
+    end
+
+    subgraph "notification-controller"
+        NC_CRDS["Alert<br/>Provider<br/>Receiver"]
+    end
+
+    subgraph "image-reflector-controller"
+        IC_CRDS["ImageRepository<br/>ImagePolicy"]
+    end
+
+    subgraph "image-automation-controller"
+        IAC_CRDS["ImageUpdateAutomation"]
+    end
+
+    SC_CRDS -->|"produces artifacts consumed by"| KC_CRDS
+    SC_CRDS -->|"produces artifacts consumed by"| HC_CRDS
+    IC_CRDS -->|"feeds policies into"| IAC_CRDS
+    IAC_CRDS -->|"commits tag updates,<br/>triggers"| SC_CRDS
+    NC_CRDS -->|"webhook triggers"| SC_CRDS
+
+    style SC_CRDS fill:#6366f1,color:#fff
+    style KC_CRDS fill:#0f766e,color:#fff
+    style HC_CRDS fill:#0f766e,color:#fff
+    style NC_CRDS fill:#7c3aed,color:#fff
+    style IC_CRDS fill:#b45309,color:#fff
+    style IAC_CRDS fill:#b45309,color:#fff
+```
+
+When debugging Flux issues, match the failing resource type to its controller using this map, then check that controller's logs with `flux logs --kind=<controller>`.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Bootstrap Sequence
+
+The `flux bootstrap` command does considerably more than a simple `kubectl apply`. Understanding the full sequence makes it much easier to diagnose failures and reason about what is in your cluster after bootstrap completes.
+
+```mermaid
+sequenceDiagram
+    participant CLI as "flux CLI<br/>(local machine)"
+    participant GH as "GitHub API"
+    participant REPO as "Git Repository"
+    participant K8S as "k3s API Server"
+    participant FC as "Flux Controllers<br/>(flux-system ns)"
+
+    CLI->>GH: Create repo if not exists (PAT auth)
+    GH-->>CLI: Repo URL confirmed
+
+    CLI->>K8S: Install Flux CRDs
+    K8S-->>CLI: CRDs ready
+
+    CLI->>K8S: Deploy Flux controllers<br/>(source, kustomize, helm, notification)
+    K8S-->>CLI: Controllers Running
+
+    CLI->>CLI: Generate deploy key (SSH keypair)
+    CLI->>GH: Register SSH deploy key on repository
+    GH-->>CLI: Deploy key accepted
+
+    CLI->>REPO: Commit Flux manifests to<br/>clusters/my-cluster/flux-system/
+    REPO-->>CLI: Push confirmed
+
+    Note over FC,REPO: Flux controllers now self-manage
+    FC->>REPO: GitRepository polls every interval
+    REPO-->>FC: Returns latest commit SHA
+
+    FC->>FC: source-controller archives repo
+    FC->>FC: kustomize-controller applies<br/>clusters/my-cluster/ path
+
+    FC->>K8S: kubectl apply (idempotent)
+    K8S-->>FC: Resources reconciled
+```
+
+This is why `flux bootstrap` is idempotent — if you run it twice, it simply re-applies the same manifests. If the deploy key already exists and the controllers are running, bootstrap becomes a no-op.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## GitRepository to Kustomization Chain
+
+Once bootstrapped, every application you add to the cluster follows the same reconciliation chain. The diagram below traces a single manifest change from Git commit to running Pod.
+
+```mermaid
+graph LR
+    GIT[("Git Repo<br/>(GitHub)")]
+    GR["GitRepository CR<br/>polls every interval"]
+    ART[("Artifact archive<br/>(tar.gz in source-controller)")]
+    KZ["Kustomization CR<br/>path: ./deploy/production"]
+    KB["kustomize build<br/>(runs in memory)"]
+    KA["kubectl apply<br/>(server-side apply)"]
+    DEP["Deployment / Service /<br/>ConfigMap in cluster"]
+    HC_CHECK["Health check<br/>deployment.status.availableReplicas"]
+    READY{{"All healthy?"}}
+    SYNC_OK["Kustomization<br/>status: Ready=True"]
+    SYNC_FAIL["Kustomization<br/>status: Ready=False"]
+
+    GIT -->|"new commit detected"| GR
+    GR -->|"clone + archive"| ART
+    ART -->|"sourceRef"| KZ
+    KZ -->|"extract + build"| KB
+    KB -->|"apply manifests"| KA
+    KA -->|"creates/updates"| DEP
+    DEP -->|"checked by"| HC_CHECK
+    HC_CHECK --> READY
+    READY -->|"yes"| SYNC_OK
+    READY -->|"no (timeout)"| SYNC_FAIL
+
+    style GIT fill:#24292e,color:#fff
+    style SYNC_OK fill:#16a34a,color:#fff
+    style SYNC_FAIL fill:#dc2626,color:#fff
+```
+
+The key insight: `source-controller` and `kustomize-controller` are decoupled. A `Kustomization` references a `GitRepository` by name — you can have many `Kustomization` objects all pointing at the same `GitRepository` source, applying different paths with different intervals and target namespaces.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

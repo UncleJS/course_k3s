@@ -8,6 +8,9 @@
 ## Table of Contents
 - [Overview](#overview)
 - [ArgoCD Architecture](#argocd-architecture)
+- [ArgoCD Component Connections](#argocd-component-connections)
+- [Sync Flow Sequence](#sync-flow-sequence)
+- [Application CR Fields Overview](#application-cr-fields-overview)
 - [Installing ArgoCD via Helm](#installing-argocd-via-helm)
 - [Accessing the UI](#accessing-the-ui)
 - [Initial Admin Password](#initial-admin-password)
@@ -33,41 +36,41 @@ ArgoCD is a declarative, GitOps continuous delivery tool for Kubernetes. It is p
 ```mermaid
 graph TD
     subgraph External
-        GIT[(Git Repository)]
-        HELM_REPO[(Helm Repository)]
-        OCI[(OCI Registry)]
-        USER[Developer / Ops]
-        CI[CI Pipeline]
+        GIT[("Git Repository")]
+        HELM_REPO[("Helm Repository")]
+        OCI[("OCI Registry")]
+        USER["Developer / Ops"]
+        CI["CI Pipeline"]
     end
 
-    subgraph ArgoCD["ArgoCD (namespace: argocd)"]
-        API[argocd-server API + Web UI]
-        REPO_SRV[argocd-repo-server clones + renders manifests]
-        APP_CTRL[argocd-application-controller reconciles + syncs]
-        REDIS[(Redis cache)]
-        DEXSERVER[dex-server OIDC / OAuth2 auth]
-        NOTIF[notifications-controller alerts]
+    subgraph "ArgoCD (namespace: argocd)"
+        API["argocd-server<br/>API + Web UI"]
+        REPO_SRV["argocd-repo-server<br/>clones + renders manifests"]
+        APP_CTRL["argocd-application-controller<br/>reconciles + syncs"]
+        REDIS[("Redis cache")]
+        DEXSERVER["dex-server<br/>OIDC / OAuth2 auth"]
+        NOTIF["notifications-controller<br/>alerts"]
     end
 
-    subgraph Target["Target Cluster(s)"]
-        K8S1[Production]
-        K8S2[Staging]
-        K8S3[Dev]
+    subgraph "Target Cluster(s)"
+        K8S1["Production"]
+        K8S2["Staging"]
+        K8S3["Dev"]
     end
 
-    USER -->|HTTPS UI / CLI| API
-    CI -->|argocd app sync| API
+    USER -->|"HTTPS UI / CLI"| API
+    CI -->|"argocd app sync"| API
     API --> REPO_SRV
-    REPO_SRV -->|git clone / helm fetch| GIT
-    REPO_SRV -->|fetch charts| HELM_REPO
-    REPO_SRV -->|pull artifact| OCI
+    REPO_SRV -->|"git clone / helm fetch"| GIT
+    REPO_SRV -->|"fetch charts"| HELM_REPO
+    REPO_SRV -->|"pull artifact"| OCI
     REPO_SRV --> REDIS
     API --> APP_CTRL
     APP_CTRL -->|watch| K8S1
     APP_CTRL -->|watch| K8S2
     APP_CTRL -->|watch| K8S3
     APP_CTRL --> DEXSERVER
-    NOTIF -->|Slack / email| USER
+    NOTIF -->|"Slack / email"| USER
 
     style API fill:#6366f1,color:#fff
     style APP_CTRL fill:#6366f1,color:#fff
@@ -82,6 +85,138 @@ graph TD
 | **argocd-application-controller** | Watches Application resources, compares desired (Git) vs live (cluster) state, and syncs on demand or automatically. |
 | **dex-server** | OpenID Connect (OIDC) provider for SSO integration (GitHub, GitLab, LDAP). |
 | **notifications-controller** | Sends notifications (Slack, email, GitHub commit status) on sync events. |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## ArgoCD Component Connections
+
+The architecture diagram above shows all components but may not make the data-flow obvious. This flowchart focuses on the request path — from a developer triggering a sync to manifests landing in the cluster.
+
+```mermaid
+flowchart LR
+    DEV["Developer / Operator"]
+    API["argocd-server<br/>(API + Web UI)"]
+    DEX["dex-server<br/>(SSO / OIDC)"]
+    REDIS[("Redis<br/>manifest cache")]
+    REPO["argocd-repo-server<br/>(manifest renderer)"]
+    GIT[("Git / Helm /<br/>OCI source")]
+    CTRL["argocd-application-controller<br/>(reconciler)"]
+    NOTIF["notifications-controller"]
+    K8S["Target Kubernetes<br/>cluster(s)"]
+
+    DEV -->|"login via browser or CLI"| API
+    API -->|"authenticate via OIDC"| DEX
+    DEX -->|"token"| API
+    API -->|"request manifests"| REPO
+    REPO -->|"check cache"| REDIS
+    REPO -->|"cache miss:<br/>clone / fetch"| GIT
+    GIT -->|"raw manifests"| REPO
+    REPO -->|"rendered manifests"| API
+    API -->|"desired state"| CTRL
+    CTRL -->|"compare vs live state"| K8S
+    CTRL -->|"apply diff (sync)"| K8S
+    CTRL -->|"emit sync event"| NOTIF
+    NOTIF -->|"Slack / email / webhook"| DEV
+```
+
+Two things to note: First, `argocd-repo-server` is the CPU-intensive component — it runs `helm template`, `kustomize build`, and custom plugins for every diff and sync. Sizing it correctly matters. Second, `argocd-application-controller` is the only component with direct write access to target clusters; the API server itself never touches cluster resources directly.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Sync Flow Sequence
+
+Understanding the full lifecycle of a change — from a developer's `git push` to a healthy Kubernetes deployment — helps you interpret ArgoCD's UI status and know which component to investigate when things go wrong.
+
+```mermaid
+sequenceDiagram
+    participant Dev as "Developer"
+    participant Git as "Git Repository"
+    participant CTRL as "argocd-application-controller"
+    participant REPO as "argocd-repo-server"
+    participant K8S as "Kubernetes Cluster"
+    participant UI as "ArgoCD UI / CLI"
+
+    Dev->>Git: git push (new image tag or config change)
+
+    Note over CTRL: polls every ~3 min (or webhook)
+    CTRL->>REPO: fetch + render manifests for app
+    REPO->>Git: git clone / pull latest commit
+    Git-->>REPO: manifests at HEAD
+    REPO-->>CTRL: rendered manifest set
+
+    CTRL->>K8S: get live resource state
+    K8S-->>CTRL: live manifest set
+
+    CTRL->>CTRL: diff desired vs live
+    CTRL->>UI: status = OutOfSync
+
+    alt Manual sync policy
+        Dev->>UI: clicks SYNC button
+        UI->>CTRL: trigger sync
+    else Automated sync policy
+        CTRL->>CTRL: auto-triggers sync
+    end
+
+    CTRL->>K8S: kubectl apply (server-side apply)
+    K8S-->>CTRL: resources created / updated
+
+    loop Health check polling
+        CTRL->>K8S: check Deployment.status
+        K8S-->>CTRL: availableReplicas / conditions
+    end
+
+    CTRL->>UI: status = Synced + Healthy
+```
+
+The `OutOfSync` state does not mean something is broken — it simply means ArgoCD has detected a diff and is waiting to apply it. With `automated` sync policy this happens transparently; with manual sync policy it waits for human approval, making it useful as a lightweight deployment gate for production environments.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Application CR Fields Overview
+
+The `Application` custom resource is the central object in ArgoCD. Every field has a specific role in the GitOps pipeline.
+
+```mermaid
+graph TD
+    APP["Application CR<br/>argoproj.io/v1alpha1"]
+
+    APP --> META["metadata<br/>name, namespace, finalizers"]
+    APP --> SPEC["spec"]
+
+    SPEC --> PROJECT["project<br/>RBAC boundary"]
+    SPEC --> SOURCE["source<br/>(or sources[])"]
+    SPEC --> DEST["destination<br/>server + namespace"]
+    SPEC --> POLICY["syncPolicy"]
+    SPEC --> IGNORE["ignoreDifferences"]
+    SPEC --> INFO["info[]<br/>UI links / annotations"]
+
+    SOURCE --> REPO_URL["repoURL<br/>Git or Helm repo"]
+    SOURCE --> REV["targetRevision<br/>branch / tag / SHA"]
+    SOURCE --> PATH["path<br/>(for Git sources)"]
+    SOURCE --> HELM_CFG["helm<br/>values, valueFiles, parameters"]
+    SOURCE --> KUST_CFG["kustomize<br/>images, namePrefix, patches"]
+
+    DEST --> SERVER["server<br/>https://kubernetes.default.svc<br/>or external cluster URL"]
+    DEST --> NS["namespace"]
+
+    POLICY --> AUTO["automated<br/>prune + selfHeal"]
+    POLICY --> OPTS["syncOptions<br/>CreateNamespace, PruneLast, ..."]
+    POLICY --> RETRY["retry<br/>limit + backoff"]
+
+    style APP fill:#6366f1,color:#fff
+    style SPEC fill:#0f766e,color:#fff
+    style SOURCE fill:#0f766e,color:#fff
+    style DEST fill:#0f766e,color:#fff
+    style POLICY fill:#0f766e,color:#fff
+```
+
+The `ignoreDifferences` field is frequently overlooked but critical for real-world usage. Without it, resources managed by controllers (HPA changing `spec.replicas`, cert-manager updating certificate annotations) will constantly show `OutOfSync`, creating noise that obscures genuine drift.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

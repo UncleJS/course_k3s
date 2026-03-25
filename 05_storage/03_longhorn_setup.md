@@ -10,6 +10,9 @@
 
 - [What is Longhorn?](#what-is-longhorn)
 - [Longhorn Architecture](#longhorn-architecture)
+- [Longhorn Component Flow](#longhorn-component-flow)
+- [Volume Creation Sequence](#volume-creation-sequence)
+- [Replica Placement Across Nodes](#replica-placement-across-nodes)
 - [Prerequisites](#prerequisites)
 - [Installing Longhorn](#installing-longhorn)
 - [Accessing the Longhorn UI](#accessing-the-longhorn-ui)
@@ -96,6 +99,128 @@ flowchart TD
 | Replicas | Actual data storage on each node |
 | CSI Driver | Standard Kubernetes storage interface |
 | Instance Manager | Manages engine and replica processes |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Longhorn Component Flow
+
+The following diagram shows how the Longhorn components relate at the infrastructure level, including the S3 backup target that enables off-cluster disaster recovery:
+
+```mermaid
+flowchart LR
+    subgraph "Kubernetes Control Plane"
+        CSI["CSI Driver<br/>(DaemonSet)"]
+        LM["Longhorn Manager<br/>(DaemonSet — all nodes)"]
+        LUI["Longhorn UI"]
+        LUI --> LM
+    end
+
+    subgraph "Node 1"
+        ENG1["Longhorn Engine<br/>(per volume)"]
+        R1[("Replica 1")]
+        ENG1 -->|"sync writes"| R1
+    end
+
+    subgraph "Node 2"
+        ENG2["Longhorn Engine<br/>(same volume, active)"]
+        R2[("Replica 2")]
+        ENG2 -->|"sync writes"| R2
+    end
+
+    subgraph "Node 3"
+        R3[("Replica 3")]
+    end
+
+    S3[("S3 Backup Target<br/>s3://bucket@region")]
+
+    CSI --> LM
+    LM --> ENG1
+    ENG1 -->|"sync writes"| R3
+    LM -->|"scheduled backup"| S3
+```
+
+The Longhorn Manager DaemonSet runs on every node and is the central brain — it receives provisioning requests from the CSI driver and decides where to place replicas based on available disk space, node availability, and replica count settings. Each volume gets its own dedicated Engine process, which means a slow or crashing volume is isolated from other volumes.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Volume Creation Sequence
+
+When a PVC is created with `storageClassName: longhorn`, the following sequence runs automatically:
+
+```mermaid
+sequenceDiagram
+    participant Dev as "Developer"
+    participant K8S as "Kubernetes API"
+    participant CSI as "Longhorn CSI Driver"
+    participant LM as "Longhorn Manager"
+    participant ENG as "Longhorn Engine"
+    participant N1 as "Node 1 Replica"
+    participant N2 as "Node 2 Replica"
+    participant N3 as "Node 3 Replica"
+
+    Dev->>K8S: kubectl apply PVC (storageClass: longhorn)
+    K8S->>CSI: CreateVolume RPC
+    CSI->>LM: Request volume creation
+    LM->>LM: Select nodes for replicas
+    LM->>N1: Create replica process
+    LM->>N2: Create replica process
+    LM->>N3: Create replica process
+    LM->>ENG: Start engine, connect to 3 replicas
+    ENG-->>LM: Engine healthy
+    LM-->>CSI: Volume created OK
+    CSI-->>K8S: PV created and bound
+    Note over K8S: PVC status → Bound
+    Dev->>K8S: kubectl apply Pod (references PVC)
+    K8S->>CSI: NodeStageVolume + NodePublishVolume RPC
+    CSI->>ENG: Mount volume on node
+    Note over ENG,N1: All writes replicated<br/>synchronously to all replicas
+```
+
+The three replica creation steps happen in parallel — Longhorn selects the best nodes based on available disk space and anti-affinity (it tries not to place two replicas on the same node). Only when all replicas are healthy does the engine start and the PVC transition to `Bound`.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Replica Placement Across Nodes
+
+Longhorn's replica placement strategy is central to its HA guarantees. With 3 replicas across 3 nodes, the cluster can survive a complete node failure with zero data loss:
+
+```mermaid
+graph TD
+    subgraph "3-Node k3s Cluster"
+        subgraph "Node 1 (worker-01)"
+            R1A[("Volume A<br/>Replica 1")]
+            R2B[("Volume B<br/>Replica 2")]
+        end
+
+        subgraph "Node 2 (worker-02)"
+            R1B[("Volume A<br/>Replica 2")]
+            R2C[("Volume B<br/>Replica 3")]
+        end
+
+        subgraph "Node 3 (worker-03)"
+            R1C[("Volume A<br/>Replica 3")]
+            R2A[("Volume B<br/>Replica 1")]
+        end
+    end
+
+    ENG_A["Engine A"] --> R1A & R1B & R1C
+    ENG_B["Engine B"] --> R2A & R2B & R2C
+
+    FAIL["Node 1 fails"] -.->|"💥"| R1A
+    FAIL -.->|"💥"| R2B
+    NOTE["Engines rebuild<br/>replicas on spare capacity"] --> ENG_A & ENG_B
+
+    style FAIL fill:#fee2e2,color:#ef4444
+    style NOTE fill:#fef9c3,color:#854d0e
+```
+
+Longhorn spreads replicas across nodes by default. If a node fails, the affected engine immediately detects the missing replica and triggers a rebuild on another healthy node. During the rebuild, the volume remains accessible (read/write) because the remaining replicas still satisfy a quorum. Only if a second node fails before the rebuild completes would the volume become degraded.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

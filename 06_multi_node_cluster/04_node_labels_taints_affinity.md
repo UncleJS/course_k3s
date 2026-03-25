@@ -10,7 +10,9 @@
 - [Node Labels](#node-labels)
 - [Node Selectors](#node-selectors)
 - [Node Taints and Tolerations](#node-taints-and-tolerations)
+- [Taint and Toleration Matching](#taint-and-toleration-matching)
 - [Node Affinity](#node-affinity)
+- [Scheduling Decision Tree](#scheduling-decision-tree)
 - [Pod Affinity and Anti-Affinity](#pod-affinity-and-anti-affinity)
 - [Topology Spread Constraints](#topology-spread-constraints)
 - [Common Scheduling Patterns](#common-scheduling-patterns)
@@ -167,6 +169,48 @@ kubectl taint node server-01 node-role.kubernetes.io/control-plane:NoSchedule-
 
 ---
 
+## Taint and Toleration Matching
+
+Taints and tolerations work as a key-value-effect triplet. A pod must have a toleration that exactly matches the taint's key, value, and effect to be allowed on the node. Here is a visual model of the matching logic:
+
+```mermaid
+graph LR
+    subgraph "Node — tainted"
+        T1["Taint:<br/>dedicated=gpu:NoSchedule"]
+        T2["Taint:<br/>maintenance=true:NoExecute"]
+    end
+
+    subgraph "Pod A — GPU workload"
+        TOL1["Toleration:<br/>dedicated=gpu:NoSchedule"]
+    end
+
+    subgraph "Pod B — system pod"
+        TOL2["Toleration:<br/>dedicated=gpu:NoSchedule"]
+        TOL3["Toleration:<br/>maintenance=true:NoExecute"]
+    end
+
+    subgraph "Pod C — regular app"
+        NOTOL["No tolerations"]
+    end
+
+    TOL1 -->|"matches T1<br/>can schedule"| T1
+    NOTOL -->|"no match<br/>blocked"| T1
+    TOL2 -->|"matches T1"| T1
+    TOL3 -->|"matches T2<br/>survives eviction"| T2
+    NOTOL -.->|"blocked + evicted"| T2
+
+    style TOL1 fill:#22c55e,color:#fff
+    style TOL2 fill:#22c55e,color:#fff
+    style TOL3 fill:#22c55e,color:#fff
+    style NOTOL fill:#ef4444,color:#fff
+```
+
+A common misconception: a toleration is not a magnet — it does not *attract* a pod to a tainted node, it only *allows* scheduling there. To force a pod onto a specific tainted node, you must combine a toleration (to pass the taint gate) with a `nodeSelector` or `nodeAffinity` (to actively target that node).
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
 ## Node Affinity
 
 Node affinity is a more expressive replacement for `nodeSelector`, supporting operators like `In`, `NotIn`, `Exists`, `Gt`, `Lt`.
@@ -213,6 +257,45 @@ spec:
 ```
 
 > The `weight` (1–100) determines priority when multiple preferences match.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Scheduling Decision Tree
+
+The Kubernetes scheduler evaluates constraints in a specific order. Understanding this order helps you reason about why a pod lands where it does — or why it stays `Pending`:
+
+```mermaid
+flowchart TD
+    START(["Pod submitted to scheduler"]) --> NS{"Has<br/>nodeSelector?"}
+
+    NS -->|"Yes"| NSC{"Node has<br/>ALL required labels?"}
+    NSC -->|"No matching node"| PEND1(["Pod: Pending<br/>no nodeSelector match"])
+    NSC -->|"Matching nodes found"| AFF
+
+    NS -->|"No"| AFF{"Has required<br/>nodeAffinity?"}
+    AFF -->|"Yes"| AFFC{"Node satisfies<br/>required rules?"}
+    AFFC -->|"No"| PEND2(["Pod: Pending<br/>no affinity match"])
+    AFFC -->|"Yes"| TAINT
+
+    AFF -->|"No"| TAINT{"Node has<br/>taints?"}
+    TAINT -->|"Yes"| TAINTC{"Pod has matching<br/>toleration for<br/>each taint?"}
+    TAINTC -->|"NoSchedule not tolerated"| PEND3(["Pod: blocked<br/>taint not tolerated"])
+    TAINTC -->|"All taints tolerated"| PREF
+
+    TAINT -->|"No taints"| PREF{"Has preferred<br/>nodeAffinity?"}
+    PREF -->|"Yes"| SCORE["Score nodes by<br/>preference weights"]
+    SCORE --> PLACE
+    PREF -->|"No"| PLACE(["Pod placed on<br/>best-scoring node"])
+
+    style PEND1 fill:#fee2e2,color:#ef4444
+    style PEND2 fill:#fee2e2,color:#ef4444
+    style PEND3 fill:#fee2e2,color:#ef4444
+    style PLACE fill:#dcfce7,color:#166534
+```
+
+The scheduler runs two phases: **filtering** (removes nodes that fail hard constraints like `nodeSelector`, required affinity, and untolerated taints) and **scoring** (ranks the remaining nodes by preferred affinity weights, resource availability, and spread constraints). A pod that passes all filters but has no preferred affinity rules will land on the node with the most available resources.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

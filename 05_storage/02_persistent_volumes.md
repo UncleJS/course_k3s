@@ -13,8 +13,11 @@
 - [PersistentVolumeClaim (PVC)](#persistentvolumeclaim-pvc)
 - [StorageClass](#storageclass)
 - [Access Modes](#access-modes)
+- [Access Mode Backend Support](#access-mode-backend-support)
 - [Reclaim Policies](#reclaim-policies)
 - [PV/PVC Lifecycle](#pvpvc-lifecycle)
+- [PVC Lifecycle Flow](#pvc-lifecycle-flow)
+- [Dynamic Provisioning Sequence](#dynamic-provisioning-sequence)
 - [Volume Binding Modes](#volume-binding-modes)
 - [Static vs Dynamic Provisioning](#static-vs-dynamic-provisioning)
 - [Volume Snapshots](#volume-snapshots)
@@ -192,6 +195,61 @@ graph LR
 
 ---
 
+## Access Mode Backend Support
+
+Not every storage backend supports every access mode. Understanding which backend to reach for depends on what your workload needs:
+
+```graph LR
+    subgraph "ReadWriteOnce (RWO) — single node read/write"
+        RWO_LP["local-path"]
+        RWO_LH["Longhorn"]
+        RWO_EBS["AWS EBS"]
+        RWO_PD["GCE PD"]
+    end
+
+    subgraph "ReadOnlyMany (ROX) — many nodes read"
+        ROX_NFS["NFS"]
+        ROX_LH2["Longhorn (read-only attach)"]
+        ROX_CF["CephFS"]
+    end
+
+    subgraph "ReadWriteMany (RWX) — many nodes read/write"
+        RWX_NFS["NFS"]
+        RWX_CF2["CephFS"]
+        RWX_LH3["Longhorn (v1.5+ via NFS share)"]
+        RWX_AFS["Azure File Share"]
+    end
+```
+
+```mermaid
+graph LR
+    subgraph "ReadWriteOnce"
+        RWO1["local-path"]
+        RWO2["Longhorn"]
+        RWO3["AWS EBS"]
+        RWO4["GCE PD"]
+    end
+
+    subgraph "ReadOnlyMany"
+        ROX1["NFS"]
+        ROX2["CephFS"]
+        ROX3["Longhorn (read-only)"]
+    end
+
+    subgraph "ReadWriteMany"
+        RWX1["NFS"]
+        RWX2["CephFS"]
+        RWX3["Azure File Share"]
+        RWX4["Longhorn (v1.5+ NFS mode)"]
+    end
+```
+
+Choosing the wrong access mode is a common source of `Pending` PVCs. For stateless workloads that need shared storage (e.g., multiple web server replicas reading the same assets), you must use an RWX-capable backend like NFS or CephFS. For databases and stateful apps that write to a single volume, RWO from local-path or Longhorn is the right choice.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
 ## Reclaim Policies
 
 What happens to a PV when its PVC is deleted:
@@ -257,6 +315,74 @@ kubectl delete pvc <pvc-name>
 # Check PV is gone (or retained)
 kubectl get pv
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## PVC Lifecycle Flow
+
+The following diagram traces the full path of a PVC from creation through use and deletion. Each state transition has concrete causes, and understanding them helps diagnose why a PVC is stuck at any given stage.
+
+```mermaid
+flowchart TD
+    A(["PVC Created"]) --> B{"StorageClass<br/>exists?"}
+    B -->|"No"| PEND["PVC: Pending<br/>(no provisioner)"]
+    B -->|"Yes"| C{"Binding<br/>Mode?"}
+    C -->|"Immediate"| D["Provisioner creates PV"]
+    C -->|"WaitForFirstConsumer"| E["Wait for Pod<br/>to reference PVC"]
+    E --> F["Pod scheduled<br/>to a node"]
+    F --> D
+    D --> G["PVC: Bound<br/>PV assigned"]
+    G --> H["Pod mounts volume<br/>at specified path"]
+    H --> I["App reads / writes data"]
+    I --> J{"Pod deleted?"}
+    J -->|"No"| I
+    J -->|"Yes"| K["Volume unmounted<br/>PVC still Bound"]
+    K --> L{"PVC deleted?"}
+    L -->|"No"| K
+    L -->|"Yes"| M["PV: Released"]
+    M --> N{"Reclaim Policy?"}
+    N -->|"Delete"| O(["PV and data deleted"])
+    N -->|"Retain"| P(["PV remains — manual<br/>cleanup required"])
+
+    style A fill:#6366f1,color:#fff
+    style G fill:#22c55e,color:#fff
+    style O fill:#ef4444,color:#fff
+    style P fill:#f59e0b,color:#fff
+```
+
+Key insight: when `volumeBindingMode: WaitForFirstConsumer` is set (the default for `local-path`), the PVC stays `Pending` until a pod actually references it and gets scheduled. This is intentional — it ensures the PV is created on the same node where the pod will run, avoiding cross-node volume access issues.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+---
+
+## Dynamic Provisioning Sequence
+
+Dynamic provisioning removes the need for admins to pre-create PVs. The provisioner creates the PV on-demand in response to a PVC. Here is the exact sequence of interactions between the components:
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant K8S as "Kubernetes API"
+    participant SC as "StorageClass<br/>Provisioner"
+    participant PV as "PersistentVolume"
+    participant Pod as "Pod"
+
+    Dev->>K8S: kubectl apply PVC (storageClass: local-path)
+    K8S->>SC: PVC created — notify provisioner
+    SC->>K8S: Create PV matching PVC spec
+    K8S->>PV: PV object created (Available)
+    K8S->>K8S: Bind PVC to PV
+    Note over K8S: PVC status → Bound
+    Dev->>K8S: kubectl apply Pod (references PVC)
+    K8S->>Pod: Schedule Pod to node
+    Pod->>PV: Mount volume at spec.volumes path
+    Note over Pod,PV: Container reads/writes<br/>via mounted path
+```
+
+The provisioner is a controller (often a DaemonSet or Deployment) that watches for unbound PVCs matching its StorageClass. When it sees one, it allocates the underlying storage resource (a directory, a disk, a cloud volume) and creates a PV object. The Kubernetes control plane then performs the binding step automatically.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
