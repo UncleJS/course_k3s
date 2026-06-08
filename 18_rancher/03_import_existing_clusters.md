@@ -635,6 +635,15 @@ The script performs preflight checks, calls the Rancher API, applies the manifes
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Rancher — Importing Existing Clusters](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/kubernetes-clusters-in-rancher-setup/register-existing-clusters)
+- [Rancher — Cluster Agents](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/kubernetes-clusters-in-rancher-setup/about-rancher-agents)
+- [Rancher Documentation](https://ranchermanager.docs.rancher.com/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

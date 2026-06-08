@@ -227,8 +227,12 @@ jobs:
           kubectl get nodes
 
       # Deploy using Helm
-      # --atomic: automatically rolls back if deploy fails
-      # --wait: blocks until all pods are ready
+      #   --atomic: automatically rolls back if deploy fails
+      #   --wait: blocks until all pods are ready
+      # NOTE: pin the image by tag OR by digest, not both. A standard chart references
+      # repository:tag (used below). To pin immutably by digest instead, replace the
+      # --set image.tag line with --set image.digest=${{ needs.build.outputs.image-digest }}
+      # and have the chart template build repository@digest from .Values.image.digest.
       - name: Deploy with Helm
         run: |
           helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
@@ -237,7 +241,6 @@ jobs:
             --create-namespace \
             --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
             --set image.tag=${{ needs.build.outputs.image-tag }} \
-            --set image.digest=${{ needs.build.outputs.image-digest }} \
             --set replicaCount=2 \
             --set resources.requests.cpu=50m \
             --set resources.requests.memory=64Mi \

@@ -403,7 +403,7 @@ spec:
 
 ```bash
 # 1. Record current versions
-kubectl version --short
+kubectl version
 helm list -A
 kubectl get nodes -o wide
 
@@ -449,13 +449,13 @@ kubectl get pods -A | grep -v Running | grep -v Completed
 
 # 3. Check API server accessibility
 kubectl cluster-info
-kubectl version --short
+kubectl version
 
 # 4. Check etcd health (if using embedded etcd)
 ETCDCTL_ENDPOINTS='https://127.0.0.1:2379' \
   ETCDCTL_CACERT='/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt' \
-  ETCDCTL_CERT='/var/lib/rancher/k3s/server/tls/etcd/client.crt' \
-  ETCDCTL_KEY='/var/lib/rancher/k3s/server/tls/etcd/client.key' \
+  ETCDCTL_CERT='/var/lib/rancher/k3s/server/tls/etcd/server-client.crt' \
+  ETCDCTL_KEY='/var/lib/rancher/k3s/server/tls/etcd/server-client.key' \
   ETCDCTL_API=3 etcdctl endpoint health
 
 # 5. Check workloads in critical namespaces

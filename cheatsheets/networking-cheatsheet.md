@@ -28,7 +28,7 @@
 | `NodePort` | Yes | Yes (node IP + port 30000-32767) | Dev/test, no load balancer |
 | `LoadBalancer` | Yes | Yes (external IP via cloud or Klipper) | Production external access |
 | `ExternalName` | Yes (CNAME) | No | Alias to external DNS name |
-| `Headless` (`clusterIP: None`) | Yes (DNS → pod IPs) | No | StatefulSets, direct pod addressing |
+| `ClusterIP` with `clusterIP: None` ("headless") | Yes (DNS → pod IPs) | No | StatefulSets, direct pod addressing |
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

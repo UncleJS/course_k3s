@@ -273,6 +273,15 @@ Modules 11.02 and 11.03 cover Flux v2 and ArgoCD respectively — the two most w
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [OpenGitOps — Principles](https://opengitops.dev/)
+- [Flux Documentation](https://fluxcd.io/flux/)
+- [Argo CD Documentation](https://argo-cd.readthedocs.io/en/stable/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

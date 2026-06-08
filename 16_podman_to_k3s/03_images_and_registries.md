@@ -655,7 +655,7 @@ kubectl create secret docker-registry ghcr-creds \
 ### Automating rotation with External Secrets Operator
 ```yaml
 # external-secret.yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: ghcr-creds

@@ -517,5 +517,15 @@ Work through this before starting a Docker → k3s migration:
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Kubernetes — Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
+- [Kompose — Convert Compose to Kubernetes](https://kompose.io/)
+- [Kubernetes — Containers Overview](https://kubernetes.io/docs/concepts/containers/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

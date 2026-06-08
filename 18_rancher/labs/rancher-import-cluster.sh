@@ -124,7 +124,7 @@ preflight() {
 
   # 2. kubectl available
   if command -v kubectl &>/dev/null; then
-    success "kubectl: $(kubectl version --client --short 2>/dev/null | head -1)"
+    success "kubectl: $(kubectl version --client 2>/dev/null | head -1)"
   else
     error "kubectl not found — install kubectl before running this script"
     (( errors++ ))

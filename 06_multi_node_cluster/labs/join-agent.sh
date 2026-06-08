@@ -137,8 +137,10 @@ run_checks() {
     info "No existing k3s installation detected ✓"
   fi
 
-  step "5/5  Checking required ports are accessible"
-  for PORT in 6443 6444; do
+  step "5/5  Checking required port is accessible"
+  # Agents join over 6443 (the supervisor is multiplexed onto it). 6444 is bound to
+  # localhost on the server, so it is intentionally NOT checked here.
+  for PORT in 6443; do
     if timeout 3 bash -c ">/dev/tcp/${SERVER_IP}/${PORT}" 2>/dev/null; then
       info "Port ${PORT} is open ✓"
     else

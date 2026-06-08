@@ -516,6 +516,15 @@ kubectl run iperf-client --rm -it --restart=Never \
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Kubernetes — Debug Services](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/)
+- [Kubernetes — DNS Debugging Resolution](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/)
+- [k3s — Networking Services](https://docs.k3s.io/networking/networking-services)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

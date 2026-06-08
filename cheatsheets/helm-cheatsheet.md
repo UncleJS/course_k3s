@@ -60,8 +60,7 @@ helm version
 | `helm repo index ./charts/` | Generate repo index |
 
 ```bash
-# Common repos
-helm repo add stable https://charts.helm.sh/stable
+# Common repos (the old `stable` repo is archived/deprecated — omitted)
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add cert-manager https://charts.jetstack.io

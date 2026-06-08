@@ -88,7 +88,7 @@ k3s --version
 
 # What version is available on the stable channel?
 # (use ctx_execute to avoid curl - handled via API)
-kubectl version --short
+kubectl version
 ```
 
 ### Release Cadence
@@ -687,6 +687,15 @@ Kubernetes regularly removes deprecated API versions. Check the official migrati
 kubectl apply -f https://github.com/FairwindsOps/pluto/releases/latest/download/install.yaml
 kubectl pluto detect-all-in-cluster --target-versions k8s=v1.30.0
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Upgrades (Basics)](https://docs.k3s.io/upgrades/basic)
+- [k3s — Automated Upgrades (System Upgrade Controller)](https://docs.k3s.io/upgrades/automated)
+- [System Upgrade Controller](https://github.com/rancher/system-upgrade-controller)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

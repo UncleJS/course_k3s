@@ -247,10 +247,11 @@ sudo cat /var/lib/rancher/k3s/server/node-token
 # Get agent-only token (if set separately)
 sudo cat /var/lib/rancher/k3s/server/token
 
-# Rotate token (k3s v1.28+)
-k3s token rotate --new-token=<new-token>
+# Rotate token (k3s v1.28+) — the current token is required
+k3s token rotate -t <current-token> --new-token=<new-token>
 
-# List tokens
+# List bootstrap tokens (kubeadm-style; usually empty on a normal k3s cluster —
+# the node-join/server token lives at server/node-token, shown above)
 k3s token list
 ```
 
@@ -314,12 +315,14 @@ journalctl -u k3s -f
 # Check k3s version
 k3s --version
 
-# Check embedded etcd member list
+# List etcd snapshots
 k3s etcd-snapshot list
+
+# Check embedded etcd member list
 ETCDCTL_ENDPOINTS='https://127.0.0.1:2379' \
   ETCDCTL_CACERT='/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt' \
-  ETCDCTL_CERT='/var/lib/rancher/k3s/server/tls/etcd/client.crt' \
-  ETCDCTL_KEY='/var/lib/rancher/k3s/server/tls/etcd/client.key' \
+  ETCDCTL_CERT='/var/lib/rancher/k3s/server/tls/etcd/server-client.crt' \
+  ETCDCTL_KEY='/var/lib/rancher/k3s/server/tls/etcd/server-client.key' \
   ETCDCTL_API=3 etcdctl member list
 
 # Rotate TLS certificates

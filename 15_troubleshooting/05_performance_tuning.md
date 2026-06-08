@@ -139,11 +139,12 @@ bottleneck under heavy API server load.
 # Check API server latency
 time kubectl get pods -A
 
-# Check SQLite database size and fragmentation
+# Note: k3s stores cluster state via kine on SQLite, which already runs in WAL mode.
+# Inspect size/fragmentation, but the durable fix for write pressure is embedded etcd (below).
 sudo sqlite3 /var/lib/rancher/k3s/server/db/state.db \
   "SELECT page_count * page_size / 1024 / 1024 AS size_mb FROM pragma_page_count(), pragma_page_size();"
 
-# Vacuum the SQLite database (reclaim space, defragment)
+# Vacuum the SQLite database (reclaim space, defragment) — only safe with k3s stopped
 sudo systemctl stop k3s
 sudo sqlite3 /var/lib/rancher/k3s/server/db/state.db "VACUUM;"
 sudo systemctl start k3s
@@ -210,11 +211,13 @@ sudo k3s etcdctl check perf
 # Check API server memory usage
 kubectl top pods -n kube-system | grep api-server
 
-# Reduce API server memory with watch cache tuning:
+# ⚠ ADVANCED / LAST RESORT — disabling the watch cache shifts read load onto the
+# datastore (kine/etcd) and usually makes a small k3s node SLOWER, not faster.
+# Prefer reducing object count or moving to embedded etcd first.
 # /etc/rancher/k3s/config.yaml
 # kube-apiserver-arg:
-#   - "watch-cache=false"               # Disable watch cache (reduces memory, increases API load)
-#   - "default-watch-cache-size=100"    # Reduce cache size (default: varies)
+#   - "watch-cache=false"               # disables watch cache: lower apiserver RAM, much higher datastore load
+#   - "default-watch-cache-size=100"    # smaller cache (default: varies)
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -507,7 +510,7 @@ kubectl run dns-bench --rm -it --restart=Never \
 
 | Area | Default | Tuned Value | When to Apply |
 |---|---|---|---|
-| SQLite WAL mode | OFF | ON | k3s single-node with heavy API writes |
+| Datastore | SQLite/kine (already WAL) | embedded etcd (`--cluster-init`) | Single-node with heavy API writes, or > 100 nodes |
 | etcd snapshot-count | 10000 | 5000 | Reduce memory usage / compaction lag |
 | etcd quota-backend-bytes | 2Gi | 4–8Gi | Large clusters / many objects |
 | CPU governor | powersave / ondemand | performance | Latency-sensitive workloads |
@@ -519,6 +522,15 @@ kubectl run dns-bench --rm -it --restart=Never \
 | CoreDNS replicas | 1 | 2–3 | Large clusters / high DNS query rate |
 | HPA scaleUp window | 0s | 30s | Prevent rapid thrashing |
 | HPA scaleDown window | 300s | 600s | Prevent premature scale-down |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Kubernetes — Resource Management for Pods](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+- [k3s — Datastore Options](https://docs.k3s.io/datastore)
+- [Kubernetes — Considerations for Large Clusters](https://kubernetes.io/docs/setup/best-practices/cluster-large/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

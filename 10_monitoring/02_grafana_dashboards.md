@@ -426,6 +426,15 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80 &
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Grafana Documentation](https://grafana.com/docs/grafana/latest/)
+- [Grafana — Dashboards](https://grafana.com/docs/grafana/latest/dashboards/)
+- [Grafana Dashboards Library](https://grafana.com/grafana/dashboards/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

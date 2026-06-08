@@ -180,7 +180,7 @@ check_kubectl() {
   if ! command -v kubectl &>/dev/null; then
     die "kubectl not found. It is usually symlinked by k3s at /usr/local/bin/kubectl."
   fi
-  green "kubectl: $(kubectl version --client --short 2>/dev/null || kubectl version --client 2>/dev/null | head -1)"
+  green "kubectl: $(kubectl version --client 2>/dev/null || kubectl version --client 2>/dev/null | head -1)"
 }
 
 check_helm() {

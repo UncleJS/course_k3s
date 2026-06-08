@@ -74,7 +74,7 @@ A Kubernetes plugin API that allows kubelet to use different container runtimes 
 A Kubernetes workload object that creates Jobs on a schedule (using cron syntax). Used for periodic tasks such as backups, database cleanup, and report generation. See [Module 13 – Backup and DR](13_backup_and_dr/).
 
 **CSI (Container Storage Interface)**
-A specification that allows storage vendors to write plugins that work with any Kubernetes distribution. k3s ships with the *local-path-provisioner* CSI driver by default. *Longhorn* is a popular distributed CSI driver. See [Module 05 – Storage](05_storage/).
+A specification that allows storage vendors to write plugins that work with any Kubernetes distribution. k3s ships with the *local-path-provisioner* (a dynamic provisioner, not a CSI driver) as its default StorageClass. *Longhorn* is a popular distributed CSI driver. See [Module 05 – Storage](05_storage/).
 
 **ctr**
 The low-level containerd CLI. k3s wraps it as `k3s ctr` to ensure commands run in the `k8s.io` containerd namespace. Used to list, pull, and import container images directly on a node. See [Module 16 – Images and Registries](16_podman_to_k3s/03_images_and_registries.md).
@@ -250,7 +250,7 @@ A Traefik CRD that defines request/response transformations applied to matched r
 A logical isolation boundary within a Kubernetes cluster. Namespaces scope resource names, RBAC policies, NetworkPolicies, and resource quotas. k3s creates `kube-system`, `kube-public`, `kube-node-lease`, and `default` namespaces by default.
 
 **NetworkPolicy**
-A Kubernetes object that controls ingress and egress traffic between pods using label selectors. Requires a CNI that supports NetworkPolicy (Flannel alone does not; use Calico or Cilium). See [Module 09 – Security](09_security/).
+A Kubernetes object that controls ingress and egress traffic between pods using label selectors. Requires a CNI that enforces it — **k3s does so by default** via its built-in NetworkPolicy controller on the default Flannel backend (standalone Flannel outside k3s does not). Swap to Calico or Cilium only for advanced dataplanes (eBPF, L7, global policies). See [Module 09 – Security](09_security/).
 
 **Node**
 A physical or virtual machine in the cluster. In k3s terminology: *server nodes* run the control plane, *agent nodes* run workloads only. See [Module 06 – Multi-Node Clusters](06_multi_node_cluster/).

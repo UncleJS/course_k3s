@@ -412,11 +412,12 @@ EOF
 kubectl create namespace monitoring
 
 # Step 6: Install
+# --wait blocks until all pods are Ready; --timeout gives k3s on low-power hardware extra time
 helm install prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --values values-prometheus.yaml \
-  --wait          # Block until all pods are Ready
-  --timeout 10m   # k3s on low-power hardware may need extra time
+  --wait \
+  --timeout 10m
 
 # Step 7: Verify
 helm status prometheus -n monitoring
@@ -838,5 +839,15 @@ helm uninstall manifest-demo-nginx -n manifest-demo   # File deletion doesn't au
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [k3s — Helm (HelmChart / HelmChartConfig)](https://docs.k3s.io/helm)
+- [k3s — Auto-Deploying Manifests](https://docs.k3s.io/installation/packaged-components)
+- [Helm Documentation](https://helm.sh/docs/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

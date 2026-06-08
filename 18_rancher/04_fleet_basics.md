@@ -795,6 +795,15 @@ For the full multi-cluster example including production and staging GitRepos and
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Fleet Documentation](https://fleet.rancher.io/)
+- [Fleet — GitRepo Resource](https://fleet.rancher.io/gitrepo-add)
+- [Rancher — Continuous Delivery (Fleet)](https://ranchermanager.docs.rancher.com/integrations-in-rancher/fleet-gitops-at-scale)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

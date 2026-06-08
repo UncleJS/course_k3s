@@ -541,16 +541,18 @@ sequenceDiagram
 # 1. Provision new infrastructure (same VM specs, same hostnames if possible)
 # Use Terraform/Ansible — this is why IaC matters
 
-# 2. Install k3s on new server-1
+# 2. Install k3s on new server-1 but DO NOT start it yet.
+#    Use the SAME token as the original cluster. Do NOT pass --cluster-init:
+#    the restore (cluster-reset) re-initialises etcd from the snapshot.
 K3S_VERSION=v1.29.2+k3s1
 curl -sfL https://get.k3s.io | \
   INSTALL_K3S_VERSION="${K3S_VERSION}" \
+  INSTALL_K3S_SKIP_START=true \
   K3S_TOKEN="${K3S_TOKEN}" \
-  sh -s - server \
-  --cluster-init
+  sh -s - server
 
-# 3. Restore etcd snapshot (recover cluster-level resources)
-sudo systemctl stop k3s
+# 3. Restore etcd snapshot (recover cluster-level resources).
+#    The service is not running yet, so run the reset directly, then start it.
 sudo k3s server \
   --cluster-reset \
   --cluster-reset-restore-path=etcd-snapshot-20260301-060000 \
@@ -558,6 +560,9 @@ sudo k3s server \
   --etcd-s3-bucket=my-k3s-backups \
   --etcd-s3-access-key="${AWS_ACCESS_KEY_ID}" \
   --etcd-s3-secret-key="${AWS_SECRET_ACCESS_KEY}"
+# Only start k3s once the reset above reports success (it exits 0 and prints
+# "Managed etcd cluster ... has been reset"). If it errors, fix the snapshot
+# path/credentials before starting — do NOT start on a half-reset datastore.
 sudo systemctl start k3s
 
 # 4. Add remaining server nodes
@@ -876,6 +881,15 @@ kubectl get pods -A | grep -v Running
 | k3s Admin | | |
 | Storage Admin | | |
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Restoring from Snapshot (cluster-reset)](https://docs.k3s.io/datastore/backup-restore#restoring-a-snapshot-to-existing-nodes)
+- [k3s — Cluster Reset](https://docs.k3s.io/cli/server#cluster-options)
+- [Velero — Restore Reference](https://velero.io/docs/main/restore-reference/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

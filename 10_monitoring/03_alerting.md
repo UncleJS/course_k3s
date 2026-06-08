@@ -41,7 +41,7 @@ sequenceDiagram
     Note over P: Condition true for >= "for" duration
     P->>P: Alert state: FIRING
 
-    P->>AM: POST /api/v1/alerts (alert payload)
+    P->>AM: POST /api/v2/alerts (alert payload)
     AM->>AM: Group alerts by (namespace, alertname)
     AM->>AM: Apply route matching
     AM->>AM: Wait groupWait (30s) for more alerts
@@ -50,7 +50,7 @@ sequenceDiagram
     AM->>E: Send grouped notification (if critical)
 
     Note over AM: Alert resolves
-    P->>AM: POST /api/v1/alerts (resolved)
+    P->>AM: POST /api/v2/alerts (resolved)
     AM->>S: Send resolved notification
 ```
 
@@ -504,8 +504,9 @@ promtool check rules /path/to/rules.yaml
 In the Alertmanager web UI, go to **Status** → **Send Test Notification** (if configured) or use the API:
 
 ```bash
-# Send a test alert to Alertmanager
-curl -X POST http://localhost:9093/api/v1/alerts \
+# Send a test alert to Alertmanager (v2 API; the v1 /api/v1/alerts endpoint
+# was removed in Alertmanager 0.27+)
+curl -X POST http://localhost:9093/api/v2/alerts \
   -H "Content-Type: application/json" \
   -d '[{
     "labels": {
@@ -605,7 +606,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-alertmanager 9093:9
 # Visit http://localhost:9093
 
 # 4. Send a test alert
-curl -X POST http://localhost:9093/api/v1/alerts \
+curl -X POST http://localhost:9093/api/v2/alerts \
   -H "Content-Type: application/json" \
   -d '[{
     "labels": {
@@ -627,6 +628,15 @@ curl -X POST http://localhost:9093/api/v1/alerts \
 #    Matcher: alertname = TestAlert
 #    Duration: 1h
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Prometheus — Alerting Rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/)
+- [Alertmanager Configuration](https://prometheus.io/docs/alerting/latest/configuration/)
+- [Awesome Prometheus Alerts](https://samber.github.io/awesome-prometheus-alerts/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

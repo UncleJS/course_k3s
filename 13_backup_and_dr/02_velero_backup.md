@@ -1204,6 +1204,15 @@ kubectl run mc --rm -it --restart=Never --image=minio/mc:latest -- \
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Velero Documentation](https://velero.io/docs/)
+- [Velero — File System Backup](https://velero.io/docs/main/file-system-backup/)
+- [Velero — Backup Reference](https://velero.io/docs/main/backup-reference/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

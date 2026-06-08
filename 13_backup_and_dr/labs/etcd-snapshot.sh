@@ -331,13 +331,24 @@ cmd_restore() {
     info "This will reset etcd and restore state from: ${snapshot_path}"
     info "The command will exit after completion — this is expected."
 
+    local reset_log="/tmp/k3s-restore-$(date +%Y%m%d%H%M%S).log"
+    # Capture the reset's OWN exit status (PIPESTATUS[0]), not tee's. k3s exits 0
+    # after a successful cluster reset and the process terminates — that is expected.
     "${K3S_BIN}" server \
         --cluster-reset \
         --cluster-reset-restore-path="${snapshot_path}" \
-        2>&1 | tee /tmp/k3s-restore-$(date +%Y%m%d%H%M%S).log || true
-    # k3s exits with code 0 after cluster reset, but the process itself terminates
+        2>&1 | tee "${reset_log}"
+    local reset_rc=${PIPESTATUS[0]}
 
-    # Step 3: Restart k3s
+    if [[ ${reset_rc} -ne 0 ]]; then
+        error "cluster-reset FAILED (exit ${reset_rc}). See ${reset_log}."
+        error "Refusing to start k3s on a half-reset datastore."
+        error "Fix the snapshot path/credentials and re-run; do NOT 'systemctl start k3s' manually yet."
+        exit 1
+    fi
+    success "cluster-reset completed."
+
+    # Step 3: Restart k3s (only reached when the reset succeeded)
     header "Step 3 — Restarting k3s on this node"
     systemctl start k3s
 

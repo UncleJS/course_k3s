@@ -437,7 +437,7 @@ spec:
 
 ### Persistence
 
-Rancher 2.6+ uses an embedded SQLite database (backed by a PersistentVolumeClaim) for local state. In production on k3s, ensure your storage class provides durable storage (Longhorn, local-path on NVMe, or a cloud PVC). Loss of the PVC without a backup requires a full Rancher reinstall and re-import of all clusters.
+Rancher running on k3s stores its state as Kubernetes objects in the **management cluster's datastore** (k3s's kine/SQLite or embedded etcd) — it does **not** run its own SQLite database on a dedicated PVC. In production, protect that state with regular k3s datastore backups (etcd snapshots or the SQLite backup from Module 13) **and** the Rancher Backup Operator. Losing the datastore without a backup requires a full Rancher reinstall and re-import of all clusters.
 
 ### Resource Sizing for Production
 
@@ -621,6 +621,15 @@ kubectl patch namespace cattle-system \
 | **Fleet controllers not starting** | Usually a symptom of Rancher pod not fully ready | Wait for Rancher pod readiness; check `kubectl -n fleet-system logs -l app=fleet-controller` |
 | **Ingress reports TLS cert from wrong hostname** | Multiple Ingress objects exist for `cattle-system` from previous attempts | `kubectl -n cattle-system get ingress`; delete stale Ingress resources |
 | **Memory OOMKilled after hours of operation** | Default memory limit too low for clusters with many resources | Increase `resources.limits.memory` in Helm values to at least `4Gi` per pod for production |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Rancher — Install/Upgrade on Kubernetes](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster)
+- [Rancher — Helm Chart Options](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/helm-chart-options)
+- [Rancher — Backups and Disaster Recovery](https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/backup-restore-and-disaster-recovery)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -450,7 +450,7 @@ Logs are the first place to look when a pod isn't behaving as expected:
 
 ```bash
 # Basic log retrieval
-kubectl logs my-pod                           # last ~100 lines
+kubectl logs my-pod                           # entire log (use --tail=N to limit)
 kubectl logs my-pod -f                        # follow live (Ctrl+C to stop)
 kubectl logs my-pod --since=1h                # last 1 hour
 kubectl logs my-pod --since-time=2026-01-01T12:00:00Z  # since specific time
@@ -755,7 +755,7 @@ This lab gives you hands-on practice with the most important kubectl commands on
 # 1. Check the cluster is healthy
 kubectl get nodes
 kubectl cluster-info
-kubectl get componentstatuses   # control plane health (deprecated in newer k8s but works in k3s)
+kubectl get --raw='/healthz?verbose'   # control plane health (componentstatuses is deprecated and often reports false-unhealthy on k3s)
 
 # 2. See what's running in kube-system
 kubectl get all -n kube-system

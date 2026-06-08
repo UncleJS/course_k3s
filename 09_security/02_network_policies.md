@@ -8,13 +8,13 @@
 - [Overview](#overview)
 - [Default Allow-All Behaviour](#default-allow-all-behaviour)
 - [How NetworkPolicy Works Under the Hood](#how-networkpolicy-works-under-the-hood)
-- [Flannel Limitation](#flannel-limitation)
+- [NetworkPolicy Enforcement on k3s](#networkpolicy-enforcement-on-k3s)
 - [NetworkPolicy Spec Anatomy](#networkpolicy-spec-anatomy)
 - [The Default-Deny Pattern](#the-default-deny-pattern)
 - [Ingress Policies](#ingress-policies)
 - [Egress Policies](#egress-policies)
 - [Namespace Selector vs Pod Selector](#namespace-selector-vs-pod-selector)
-- [CNI Compatibility — Flannel vs Canal/Calico](#cni-compatibility--flannel-vs-canalcalico)
+- [CNI Compatibility — When to Replace Flannel](#cni-compatibility--when-to-replace-flannel)
 - [Allow Specific Ingress](#allow-specific-ingress)
 - [Allow Specific Egress](#allow-specific-egress)
 - [Namespace Isolation](#namespace-isolation)
@@ -39,7 +39,7 @@ In production, a compromised container with unrestricted network access can pivo
 Key facts:
 - NetworkPolicies are **namespace-scoped** resources
 - They are **additive** — multiple policies selecting the same pod are OR'd together
-- They only work if your **CNI plugin supports them** (Flannel alone does not)
+- They require a **CNI that enforces them** — k3s enables this **by default** via its built-in NetworkPolicy controller (standalone Flannel outside k3s does not enforce policy)
 - They operate at **Layer 3/4** (IP + port); for Layer 7 rules you need a service mesh
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -84,7 +84,7 @@ This "flat network" model is convenient but dangerous in production:
 - A misconfigured service can be reached from anywhere
 - A rogue pod can scan internal services undetected
 
-NetworkPolicies change the default — but **only if your CNI supports them**.
+NetworkPolicies change the default — and on stock k3s they are **enforced out of the box** by the built-in policy controller.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -122,7 +122,8 @@ sequenceDiagram
 
 | CNI | Enforcement Method | Performance |
 |---|---|---|
-| Flannel (alone) | None — no policy enforcement | N/A |
+| k3s (Flannel + built-in controller) | iptables/ipset (kube-router-based) | Good |
+| Standalone Flannel (non-k3s) | None — no policy enforcement | N/A |
 | Canal (Flannel + Calico) | iptables rules per-pod | Good |
 | Calico | iptables or eBPF | Good to excellent |
 | Cilium | eBPF programs (kernel bypass) | Excellent |
@@ -136,13 +137,15 @@ sequenceDiagram
 
 ---
 
-## Flannel Limitation
+## NetworkPolicy Enforcement on k3s
 
-> **This is the most important k3s-specific fact in this lesson: the default CNI is Flannel, and Flannel alone does NOT enforce NetworkPolicy.**
+> **The most important k3s-specific fact in this lesson: k3s enforces NetworkPolicy *by default*.** Unlike standalone Flannel — which has no policy engine — k3s ships a built-in NetworkPolicy controller (based on kube-router) that programs iptables/ipset rules for every `NetworkPolicy` you apply, even with the default Flannel backend.
 
-If you apply a NetworkPolicy to a k3s cluster running the default Flannel CNI, the policy object is created in the API server but **silently ignored** at the network level. All traffic still flows as if no policy exists.
+This means a deny-all policy on a stock k3s cluster **is enforced** — you do **not** need Calico or Cilium just to get basic NetworkPolicy support. (You would only swap CNIs for advanced features like eBPF dataplanes, L7/global policies, or richer observability — see the section below.)
 
-### How to check if your CNI enforces policies
+The built-in controller can be turned off with `--disable-network-policy` at install time. If you disable it (or replace Flannel without a policy engine), applied policies are accepted by the API server but **not enforced** at the network level — so always verify enforcement after changing CNI settings.
+
+### How to check if NetworkPolicy is enforced
 
 ```bash
 # Check which CNI is running
@@ -175,22 +178,24 @@ EOF
 # After policy: should fail if CNI enforces policies
 kubectl exec -n netpol-test client -- wget -q -O- --timeout=3 http://server 2>&1
 
-# If the second request succeeds, your CNI does NOT enforce NetworkPolicy.
+# On a stock k3s cluster the second request FAILS (the built-in controller enforces deny-all).
+# If it SUCCEEDS, enforcement is off — k3s was installed with --disable-network-policy,
+# or Flannel was replaced by a CNI without a policy engine.
 # Clean up
 kubectl delete namespace netpol-test
 ```
 
-### What to do if you need NetworkPolicy enforcement
+### If enforcement is disabled or you need an advanced dataplane
 
-Install Canal (Flannel networking + Calico policy engine) or replace Flannel entirely:
+If you installed k3s with `--disable-network-policy` and want policy back, reinstall without that flag. If you need an advanced dataplane (eBPF, L7 rules, global/cluster-wide policies), replace Flannel with Calico or Cilium:
 
 ```bash
-# Install k3s WITHOUT the default Flannel CNI
+# Install k3s WITHOUT the default Flannel CNI and its policy controller
 curl -sfL https://get.k3s.io | sh -s - \
   --flannel-backend=none \
   --disable-network-policy
 
-# Install Canal
+# Install Canal (Flannel networking + Calico policy engine)
 kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml
 
 # Verify Canal is running
@@ -620,30 +625,30 @@ The OR form is almost always a mistake when you intend AND. The AND form is the 
 
 ---
 
-## CNI Compatibility — Flannel vs Canal/Calico
+## CNI Compatibility — When to Replace Flannel
 
-> **Critical k3s-specific note:** The default CNI for k3s is **Flannel**, which does **not** support NetworkPolicies. Any NetworkPolicy you apply will be silently ignored.
+> **k3s-specific note:** The default CNI is **Flannel**, and k3s's **built-in NetworkPolicy controller enforces standard `NetworkPolicy` objects out of the box.** You only need to replace Flannel when you want an advanced dataplane — eBPF, Layer-7 rules, cluster-wide/global policies, or richer flow observability.
 
 ```mermaid
 flowchart TD
     subgraph "k3s default"
-        FL["Flannel VXLAN overlay"]
-        FL -->|"NetworkPolicy objects"| IGNORED["⚠ Silently ignored<br/>all traffic still allowed"]
+        FL["Flannel VXLAN + built-in policy controller"]
+        FL -->|"NetworkPolicy objects"| ENFORCED0["✓ Policies enforced<br/>iptables/ipset (kube-router)"]
     end
 
-    subgraph "NetworkPolicy-capable CNIs"
+    subgraph "Advanced-dataplane CNIs"
         CA["Canal<br/>(Flannel + Calico policy engine)"]
         CALC["Calico<br/>(eBPF or iptables)"]
-        CIL["Cilium<br/>(eBPF-native)"]
+        CIL["Cilium<br/>(eBPF-native, L7)"]
         CA --> ENFORCED1["✓ Policies enforced<br/>iptables rules"]
         CALC --> ENFORCED2["✓ Policies enforced<br/>iptables or eBPF"]
-        CIL --> ENFORCED3["✓ Policies enforced<br/>eBPF programs"]
+        CIL --> ENFORCED3["✓ Policies + L7/global<br/>eBPF programs"]
     end
 ```
 
-### Switching to Canal (recommended for most k3s deployments)
+### Switching to Canal (for Calico's richer policy model)
 
-Canal combines Flannel's networking with Calico's policy engine — minimal change, full NetworkPolicy support.
+Canal combines Flannel's networking with Calico's policy engine. Note this is **not** required for basic NetworkPolicy on k3s — only choose it for Calico-specific features (e.g. `GlobalNetworkPolicy`).
 
 ```bash
 # Install k3s WITHOUT the default Flannel CNI
@@ -866,7 +871,7 @@ podSelector:
 podSelector: {}
 ```
 
-> **Important:** NetworkPolicies are AND'd together when multiple policies select the same pod. A pod is allowed to receive/send traffic if **any** matching policy allows it.
+> **Important:** NetworkPolicies are **additive (OR'd)** — when multiple policies select the same pod, traffic is allowed if **any** matching policy allows it. (Within a *single* policy, the `from`/`to` rules are also OR'd; selectors *inside one rule entry* — e.g. `namespaceSelector` + `podSelector` in the same list item — are AND'd.)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -1098,8 +1103,9 @@ flowchart TD
 ## Lab
 
 ```bash
-# Prerequisites: Canal or Calico CNI must be installed
-# (NetworkPolicies are silently ignored with default Flannel)
+# Prerequisites: a NetworkPolicy-enforcing cluster.
+# Stock k3s qualifies (built-in controller). Only fails if installed
+# with --disable-network-policy or a CNI lacking a policy engine.
 
 # Apply all demo resources
 kubectl apply -f labs/network-policy-deny-all.yaml
@@ -1204,6 +1210,15 @@ kubectl delete namespace netpol-demo
 ```
 
 See [`labs/network-policy-deny-all.yaml`](labs/network-policy-deny-all.yaml) for the full manifest.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Kubernetes — Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [k3s — Networking Services (built-in NetworkPolicy controller)](https://docs.k3s.io/networking/networking-services)
+- [Network Policy Recipes](https://github.com/ahmetb/kubernetes-network-policy-recipes)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

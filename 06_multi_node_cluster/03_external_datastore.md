@@ -495,6 +495,15 @@ LIMIT 10;
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [k3s — High Availability with an External DB](https://docs.k3s.io/datastore/ha)
+- [kine (etcd-shim datastore)](https://github.com/k3s-io/kine)
+- [k3s — Datastore Endpoint Format](https://docs.k3s.io/datastore#datastore-endpoint-format-and-functionality)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

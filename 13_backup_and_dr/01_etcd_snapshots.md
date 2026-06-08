@@ -459,6 +459,15 @@ groups:
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [k3s — Backup and Restore](https://docs.k3s.io/datastore/backup-restore)
+- [k3s — etcd-snapshot CLI](https://docs.k3s.io/cli/etcd-snapshot)
+- [Backup & DR Cheatsheet](../cheatsheets/backup-dr-cheatsheet.md)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

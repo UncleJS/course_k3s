@@ -535,5 +535,15 @@ helm uninstall demo -n helm-lab
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Helm — Chart Template Guide](https://helm.sh/docs/chart_template_guide/)
+- [Helm — Charts](https://helm.sh/docs/topics/charts/)
+- [Helm — Best Practices](https://helm.sh/docs/chart_best_practices/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

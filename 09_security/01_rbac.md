@@ -487,6 +487,15 @@ See [`labs/rbac-role.yaml`](labs/rbac-role.yaml) for the full manifest.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Kubernetes — RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+- [Kubernetes — Authorization Overview](https://kubernetes.io/docs/reference/access-authn-authz/authorization/)
+- [Security Cheatsheet](../cheatsheets/security-cheatsheet.md)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

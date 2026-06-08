@@ -50,7 +50,7 @@ Without an Ingress controller, you'd need a separate `LoadBalancer` or `NodePort
 
 ## Traefik in k3s
 
-k3s bundles Traefik v2 (k3s ≥ v1.21) as a **HelmChart** resource. This means:
+k3s bundles **Traefik v3** (the default since k3s ~v1.29; older releases shipped Traefik v2) as a **HelmChart** resource. This means:
 - Traefik is installed and managed by a built-in Helm controller
 - Configuration is done via the `HelmChartConfig` CRD
 - It runs in the `kube-system` namespace
@@ -73,7 +73,7 @@ kubectl get svc -n kube-system traefik
 
 ```mermaid
 graph TD
-    subgraph Traefik v2
+    subgraph Traefik v3
         EP[EntryPoints :80 web :443 websecure]
         R[Routers Host / PathPrefix rules]
         M[Middlewares Redirect, Auth, RateLimit]
@@ -201,7 +201,7 @@ kubectl port-forward -n kube-system \
 
 ### Expose via IngressRoute (persistent)
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard
@@ -328,5 +328,15 @@ curl -H "Host: demo.example.com" http://<NODE_IP>/
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [k3s — Networking (Traefik Ingress)](https://docs.k3s.io/networking/networking-services#traefik-ingress-controller)
+- [Traefik Proxy Documentation](https://doc.traefik.io/traefik/)
+- [k3s — Customizing Packaged Components (HelmChartConfig)](https://docs.k3s.io/helm#customizing-packaged-components-with-helmchartconfig)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*
