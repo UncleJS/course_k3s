@@ -326,8 +326,9 @@ kubectl get nodes
 > # Add to config.yaml:
 > # tls-san:
 > #   - <SERVER_PUBLIC_IP>
+> sudo systemctl stop k3s        # rotate requires the service stopped
 > sudo k3s certificate rotate
-> sudo systemctl restart k3s
+> sudo systemctl start k3s
 > ```
 
 ### Using Multiple Kubeconfigs
@@ -486,7 +487,7 @@ Run these ten commands immediately after installation to orient yourself in the 
 
 ```bash
 # 1. What version is running?
-kubectl version --short
+kubectl version
 # Client Version: vX.YY.Z
 # Server Version: vX.YY.Z+k3s1
 

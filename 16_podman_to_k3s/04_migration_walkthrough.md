@@ -28,6 +28,9 @@
 flowchart LR
     P1[Phase 1 Assess] --> P2[Phase 2 Build & Push]
     P2 --> P3[Phase 3 Write Manifests]
+    P3 --> P4[Phase 4 Test in Staging]
+    P4 --> P5[Phase 5 Data Migration]
+    P5 --> P6[Phase 6 Cutover]
     P6 --> P7[Phase 7 Validate]
     P6 -.->|if issues| RB[Rollback]
     RB -.-> P1
@@ -47,14 +50,14 @@ Throughout this lesson we migrate **"Taskr"** — a task-management web app with
 ## Pre-Migration Checklist
 
 Run through this checklist **before** starting any migration work:
-[ ] kubectl context is pointing at the correct cluster
-[ ] A container registry is accessible (Docker Hub, GHCR, or local)
-[ ] Podman is installed on the build host
-[ ] You have a tested backup of all Podman volumes
-[ ] You know the current DNS name / IP address used to reach the app
-[ ] Monitoring / alerting is in place for the new cluster
-[ ] A rollback procedure is documented and tested
-```
+
+- [ ] kubectl context is pointing at the correct cluster
+- [ ] A container registry is accessible (Docker Hub, GHCR, or local)
+- [ ] Podman is installed on the build host
+- [ ] You have a tested backup of all Podman volumes
+- [ ] You know the current DNS name / IP address used to reach the app
+- [ ] Monitoring / alerting is in place for the new cluster
+- [ ] A rollback procedure is documented and tested
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -595,7 +598,7 @@ spec:
 
 ```yaml
 # ingressroute.yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: taskr-web
@@ -1183,7 +1186,7 @@ flowchart TD
 
 ```yaml
 # canary-ingressroute.yaml — weighted traffic split with Traefik
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: taskr-canary

@@ -290,16 +290,16 @@ export GITHUB_USER=my-github-username
 ### Bootstrap
 
 ```bash
+# --repository : repo name (created if it doesn't exist)
+# --path       : where Flux commits its manifests
+# --personal   : use a personal token (vs an org token)
+# --token-auth : use HTTPS with the token (vs an SSH deploy key)
 flux bootstrap github \
   --owner=${GITHUB_USER} \
-  # repo name (created if it doesn't exist)
   --repository=fleet-infra \
   --branch=main \
-  # where Flux will commit its manifests
   --path=clusters/my-cluster \
-  # use personal token (vs org token)
   --personal \
-  # use HTTPS with token (vs SSH deploy key)
   --token-auth
 ```
 
@@ -348,15 +348,16 @@ flux bootstrap gitlab \
 For self-hosted GitLab:
 
 ```bash
+# --hostname : self-hosted GitLab URL
+# --ca-file  : path to a custom TLS CA (omit if GitLab uses a public CA)
 flux bootstrap gitlab \
-  # self-hosted GitLab URL
   --hostname=gitlab.example.com \
   --owner=my-group \
   --repository=fleet-infra \
   --branch=main \
   --path=clusters/my-cluster \
   --token-auth \
-  --ca-file=/path/to/ca.crt             # if using custom TLS CA
+  --ca-file=/path/to/ca.crt
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -647,6 +648,15 @@ kubectl apply -f labs/flux-kustomization.yaml
 # 7. Watch reconciliation
 flux get kustomizations --watch
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Flux — Get Started](https://fluxcd.io/flux/get-started/)
+- [Flux — Bootstrap](https://fluxcd.io/flux/installation/bootstrap/)
+- [Flux — Core Concepts](https://fluxcd.io/flux/concepts/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

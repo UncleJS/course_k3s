@@ -66,7 +66,7 @@ graph LR
     A3 -->|"wss tunnel"| S
 ```
 
-The key architectural point is that agents do **not** connect to the API server directly for all operations. Most communication flows through the WebSocket tunnel on port 6444 (the supervisor port) which also serves as a reverse tunnel for the kubelet's webhook callbacks.
+The key architectural point is that agents do **not** connect to the API server directly for all operations. Communication flows over a WebSocket tunnel to the server's **supervisor**, which an external agent reaches on **port 6443**. (On a server node the supervisor and the apiserver are multiplexed onto 6443; the dedicated supervisor port **6444 is bound to localhost** and is only used on-host by a colocated agent.) The tunnel also serves as a reverse path for the kubelet's webhook callbacks.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -104,7 +104,7 @@ sequenceDiagram
 ```
 
 This design means:
-- Only **port 6443** (API) and **port 6444** (supervisor) on the server need to be reachable from workers
+- Only **port 6443** on the server needs to be reachable from workers (the supervisor is multiplexed onto it; 6444 is loopback-only and does **not** need to be opened to workers)
 - Workers do not need any inbound ports open
 - NAT traversal is handled by the outbound connection from the worker
 
@@ -120,8 +120,8 @@ Before joining an agent node ensure:
 |-------------|--------|
 | OS | Linux (same distros supported as server) |
 | Arch | amd64, arm64, or armv7 |
-| Network | Agent can reach server on **port 6443** (API) and **port 6444** (supervisor) |
-| Firewall | Open TCP 6443 and 6444 inbound on the server; no inbound needed on worker |
+| Network | Agent can reach server on **port 6443** (API + multiplexed supervisor) |
+| Firewall | Open TCP 6443 inbound on the server; no inbound needed on worker |
 | Hostname | Unique hostname per node (`hostnamectl set-hostname worker-01`) |
 | Time sync | NTP/chrony synchronized — clock skew > 5 min breaks TLS certificates |
 | No k3s yet | Agent node must **not** already have k3s installed |
@@ -130,9 +130,9 @@ Before joining an agent node ensure:
 Verify reachability from the worker node before running the installer:
 
 ```bash
-# From the worker node — test server reachability
+# From the worker node — test server reachability (6443 only;
+# 6444 is loopback-only on the server and will show as closed)
 nc -zv <SERVER_IP> 6443
-nc -zv <SERVER_IP> 6444
 
 # Or with a TLS check (expected: "ok")
 # (install curl if not present)
@@ -456,7 +456,7 @@ kubectl delete node worker-01
 sudo /usr/local/bin/k3s-agent-uninstall.sh
 ```
 
-> **Note:** `k3s-agent-uninstall.sh` also removes: the k3s binary, systemd service, `containerd` state, all cached images, and network interfaces created by k3s. It does **not** delete PersistentVolume data in `/opt/local-path-provisioner/` — clean that up manually if needed.
+> **Note:** `k3s-agent-uninstall.sh` also removes: the k3s binary, systemd service, `containerd` state, all cached images, and network interfaces created by k3s. It does **not** delete PersistentVolume data in `/var/lib/rancher/k3s/storage/` — clean that up manually if needed.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -494,6 +494,15 @@ curl -sfL https://get.k3s.io | \
 # On the server — verify
 kubectl get nodes -o wide -w
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Adding Agent Nodes](https://docs.k3s.io/quick-start#install-script)
+- [k3s — Cluster Access (kubeconfig)](https://docs.k3s.io/cluster-access)
+- [k3s — Agent Configuration Reference](https://docs.k3s.io/cli/agent)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -215,11 +215,11 @@ Example:
 
 ### Traefik
 
-Traefik is deployed as a DaemonSet in the `kube-system` namespace and binds to host ports 80 and 443.
+Traefik is deployed as a **Deployment** in the `kube-system` namespace. It is exposed by a `LoadBalancer` Service, and k3s's built-in ServiceLB (Klipper) publishes ports 80 and 443 on each node (via a `svclb-traefik` DaemonSet that uses host ports) — Traefik itself does not bind the host ports directly.
 
 ### Klipper LoadBalancer
 
-Klipper assigns the node's IP as the `LoadBalancer` IP for `Service` objects of type `LoadBalancer`. On multi-node clusters, it uses the first available node.
+For a `Service` of type `LoadBalancer`, k3s's ServiceLB (Klipper) runs a DaemonSet across the eligible nodes and populates the service's external IPs with **every** node's IP — not just one. Traffic sent to any node's IP reaches the service.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -279,7 +279,7 @@ flowchart TD
     SC[StorageClass local-path]
     PROV[local-path-provisioner]
     PV[PersistentVolume]
-    DIR["/opt/local-path-provisioner/uuid on node filesystem"]
+    DIR["/var/lib/rancher/k3s/storage/uuid on node filesystem"]
 
     POD --> PVC
     PVC --> SC
@@ -293,7 +293,7 @@ flowchart TD
 ```
 
 The default `local-path` storage class:
-- Creates a directory under `/opt/local-path-provisioner/`
+- Creates a directory under `/var/lib/rancher/k3s/storage/`
 - Binds the PVC to whichever node the pod is scheduled on
 - **Not replicated** — if the node fails, data is lost (use Longhorn for HA storage)
 

@@ -303,12 +303,13 @@ spec:
       labels:
         app: act-runner
     spec:
-      # Runner needs Docker socket access to run container jobs
-      # In production, consider using Rootless Podman or Kaniko
+      # k3s nodes run containerd, NOT Docker — there is no /var/run/docker.sock to mount.
+      # act_runner's `docker://` job labels need a Docker daemon, so we run one as a
+      # privileged docker:dind sidecar and point the runner at it over TCP.
+      # (For a daemonless alternative, build with Kaniko or rootless Buildah in the workflow.)
       volumes:
-        - name: docker-sock
-          hostPath:
-            path: /var/run/docker.sock
+        - name: dind-storage
+          emptyDir: {}
         - name: runner-config
           configMap:
             name: act-runner-config
@@ -338,9 +339,9 @@ spec:
                   key: GITEA_RUNNER_REGISTRATION_TOKEN
             - name: GITEA_INSTANCE_URL
               value: "http://gitea-http.gitea.svc.cluster.local:3000"
+            - name: DOCKER_HOST            # talk to the dind sidecar, not a host socket
+              value: "tcp://localhost:2375"
           volumeMounts:
-            - name: docker-sock
-              mountPath: /var/run/docker.sock
             - name: runner-config
               mountPath: /config
             - name: runner-data
@@ -354,6 +355,18 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
+
+        # Docker-in-Docker sidecar — the Docker daemon the runner builds against.
+        - name: dind
+          image: docker:24-dind
+          securityContext:
+            privileged: true            # dind requires a privileged container
+          env:
+            - name: DOCKER_TLS_CERTDIR   # disable TLS; daemon listens on tcp://localhost:2375
+              value: ""
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
 ```
 
 ### Step 4: Verify registration
@@ -566,6 +579,15 @@ cp labs/gitea-workflow.yml .gitea/workflows/deploy.yml
 git remote add gitea http://<node-ip>:30380/gitea-admin/my-app.git
 git push gitea main
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Gitea Actions Documentation](https://docs.gitea.com/usage/actions/overview)
+- [Gitea — Act Runner](https://docs.gitea.com/usage/actions/act-runner)
+- [act — Run GitHub Actions locally](https://github.com/nektos/act)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

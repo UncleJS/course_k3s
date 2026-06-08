@@ -355,8 +355,8 @@ kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n moni
 # Check active alerts
 curl http://localhost:9090/api/v1/alerts | python3 -m json.tool
 
-# Test alert expression
-curl "http://localhost:9090/api/v1/query?query=ALERTS{alertstate='firing'}" | python3 -m json.tool
+# Test alert expression (PromQL label values must be double-quoted)
+curl "http://localhost:9090/api/v1/query?query=ALERTS{alertstate=\"firing\"}" | python3 -m json.tool
 
 # Check Alertmanager alerts
 kubectl port-forward svc/prometheus-kube-prometheus-alertmanager 9093:9093 -n monitoring

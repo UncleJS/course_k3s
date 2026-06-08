@@ -116,12 +116,11 @@ Deploy or upgrade a Helm release from CI.
 docker build -t ghcr.io/my-org/my-app:$GIT_SHA .
 docker push ghcr.io/my-org/my-app:$GIT_SHA
 
-# Deploy with Helm
+# Deploy with Helm (--atomic rolls back automatically if the deploy fails)
 helm upgrade --install my-app ./charts/my-app \
   --namespace production \
   --set image.tag=$GIT_SHA \
   --set image.repository=ghcr.io/my-org/my-app \
-  # rollback automatically if deploy fails
   --atomic \
   --timeout 3m \
   --wait
@@ -208,12 +207,13 @@ docker push localhost:5000/my-app:latest
 Configure k3s to trust the local registry by creating `/etc/rancher/k3s/registries.yaml`:
 
 ```yaml
+# Use the same host you pushed to above (localhost:5000)
 mirrors:
-  "registry.example.com:5000":
+  "localhost:5000":
     endpoint:
-      - "http://registry.example.com:5000"
+      - "http://localhost:5000"
 configs:
-  "registry.example.com:5000":
+  "localhost:5000":
     tls:
       insecure_skip_verify: true   # only for HTTP registries
 ```
@@ -449,6 +449,15 @@ concurrency:
 - CI (build + push): needs only registry write access.
 - CD (deploy): needs only k3s namespace RBAC.
 - Never give a CI token cluster-admin permissions.
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Private Registry Configuration](https://docs.k3s.io/installation/private-registry)
+- [Kaniko — Build Images in Kubernetes](https://github.com/GoogleContainerTools/kaniko)
+- [Buildah Documentation](https://buildah.io/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

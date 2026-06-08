@@ -199,28 +199,6 @@ graph LR
 
 Not every storage backend supports every access mode. Understanding which backend to reach for depends on what your workload needs:
 
-```graph LR
-    subgraph "ReadWriteOnce (RWO) — single node read/write"
-        RWO_LP["local-path"]
-        RWO_LH["Longhorn"]
-        RWO_EBS["AWS EBS"]
-        RWO_PD["GCE PD"]
-    end
-
-    subgraph "ReadOnlyMany (ROX) — many nodes read"
-        ROX_NFS["NFS"]
-        ROX_LH2["Longhorn (read-only attach)"]
-        ROX_CF["CephFS"]
-    end
-
-    subgraph "ReadWriteMany (RWX) — many nodes read/write"
-        RWX_NFS["NFS"]
-        RWX_CF2["CephFS"]
-        RWX_LH3["Longhorn (v1.5+ via NFS share)"]
-        RWX_AFS["Azure File Share"]
-    end
-```
-
 ```mermaid
 graph LR
     subgraph "ReadWriteOnce"

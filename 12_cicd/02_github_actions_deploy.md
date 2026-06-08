@@ -212,7 +212,9 @@ graph TD
 
 ### Installing a self-hosted runner on k3s
 
-The cleanest approach for a private k3s cluster is to run the GitHub Actions runner as a Pod using the `actions-runner-controller` (ARC):
+The cleanest approach for a private k3s cluster is to run the GitHub Actions runner as a Pod using the **actions-runner-controller** (ARC).
+
+> **Which ARC?** The example below uses the legacy community ARC (`actions.summerwind.dev`, `RunnerDeployment`). GitHub's **official** ARC is now `gha-runner-scale-set`, installed from the OCI chart `oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller` and configured with `AutoscalingRunnerSet` (not `RunnerDeployment`). Prefer the official ARC for new setups; the summerwind project is community-maintained.
 
 ```bash
 # Install ARC via Helm
@@ -622,6 +624,15 @@ git push origin main
 # 6. Watch the workflow run at:
 # https://github.com/YOUR_ORG/YOUR_REPO/actions
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Actions Runner Controller (official ARC)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller)
+- [GitHub — Deploying with Actions](https://docs.github.com/en/actions/deployment/about-deployments/deploying-with-github-actions)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

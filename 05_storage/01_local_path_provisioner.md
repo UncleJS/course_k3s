@@ -35,8 +35,8 @@ The **local-path-provisioner** is a storage provisioner bundled with k3s that au
 flowchart TD
     APP["Application Pod"] -->|"requests storage"| PVC["PersistentVolumeClaim<br/>storageClass: local-path<br/>storage: 1Gi"]
     PVC -->|"unbound"| PROV["local-path-provisioner Pod<br/>(kube-system namespace)"]
-    PROV -->|"creates directory"| DIR["/opt/local-path-provisioner/<br/>pvc-abc123.../ (on node filesystem)"]
-    PROV -->|"creates"| PV["PersistentVolume<br/>hostPath: /opt/local-path-provisioner/..."]
+    PROV -->|"creates directory"| DIR["/var/lib/rancher/k3s/storage/<br/>pvc-abc123.../ (on node filesystem)"]
+    PROV -->|"creates"| PV["PersistentVolume<br/>hostPath: /var/lib/rancher/k3s/storage/..."]
     PV -->|"bound"| PVC
     PVC -->|"mounted into"| APP
 
@@ -71,7 +71,7 @@ sequenceDiagram
     API->>API: Scheduler assigns pod to node-1
     API-->>PROV: Watch event: PVC Pending + consumer pod on node-1
 
-    PROV->>NODE: mkdir /opt/local-path-provisioner/pvc-abc123.../
+    PROV->>NODE: mkdir /var/lib/rancher/k3s/storage/pvc-abc123.../
     PROV->>API: Create PV (hostPath, node affinity: node-1)
     API->>API: Bind PVC → PV
     API-->>PROV: PVC Bound
@@ -227,7 +227,7 @@ This is the most important characteristic of `local-path` to understand:
 
 ```mermaid
 flowchart TD
-    PV["PersistentVolume<br/>hostPath: /opt/local-path-provisioner/pvc-abc123/<br/>nodeAffinity: node-1"]
+    PV["PersistentVolume<br/>hostPath: /var/lib/rancher/k3s/storage/pvc-abc123/<br/>nodeAffinity: node-1"]
     PVC["PersistentVolumeClaim<br/>my-data"]
     POD1["Pod (scheduled on node-1)<br/>Mounts /opt/.../pvc-abc123/"]
     POD2["Pod (scheduled on node-2)<br/>Cannot mount — wrong node!"]
@@ -241,15 +241,15 @@ When `local-path` creates a PV, it embeds a `nodeAffinity` rule that binds the P
 ```bash
 # Find where the PV data is stored
 kubectl get pv <pv-name> -o jsonpath='{.spec.hostPath.path}'
-# /opt/local-path-provisioner/pvc-abc123-def456.../
+# /var/lib/rancher/k3s/storage/pvc-abc123-def456.../
 
 # See the node affinity binding
 kubectl get pv <pv-name> -o jsonpath='{.spec.nodeAffinity}'
 # {"required":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["node-1"]}]}]}}
 
 # On the node itself
-sudo ls /opt/local-path-provisioner/
-sudo ls /opt/local-path-provisioner/pvc-abc123.../
+sudo ls /var/lib/rancher/k3s/storage/
+sudo ls /var/lib/rancher/k3s/storage/pvc-abc123.../
 # your-files-are-here
 ```
 
@@ -270,7 +270,7 @@ flowchart LR
     PROVISION -->|"PVC: Bound"| USE["Pod uses volume<br/>read/write data"]
     USE -->|"kubectl delete pod"| RETAIN["Data stays on node-1<br/>PVC still Bound<br/>PV still exists"]
     RETAIN -->|"New pod starts"| USE
-    USE -->|"kubectl delete pvc"| DELETE["Provisioner runs cleanup Job:<br/>rm -rf /opt/local-path-provisioner/pvc-abc123/<br/>PV deleted"]
+    USE -->|"kubectl delete pvc"| DELETE["Provisioner runs cleanup Job:<br/>rm -rf /var/lib/rancher/k3s/storage/pvc-abc123/<br/>PV deleted"]
     DELETE -->|"Data permanently gone"| GONE["Storage freed"]
 ```
 
@@ -314,7 +314,7 @@ kubectl edit configmap local-path-config -n kube-system
   "nodePathMap": [
     {
       "node": "DEFAULT_PATH_FOR_NON_LISTED_NODES",
-      "paths": ["/opt/local-path-provisioner"]
+      "paths": ["/var/lib/rancher/k3s/storage"]
     }
   ]
 }
@@ -352,7 +352,7 @@ Different nodes can use different storage paths — useful when some nodes have 
   "nodePathMap": [
     {
       "node": "DEFAULT_PATH_FOR_NON_LISTED_NODES",
-      "paths": ["/opt/local-path-provisioner"]
+      "paths": ["/var/lib/rancher/k3s/storage"]
     },
     {
       "node": "storage-node-01",
@@ -406,8 +406,8 @@ kubectl top nodes   # doesn't show disk, only CPU/memory
 
 # For disk monitoring, you need a DaemonSet (node-exporter) or
 # check the node directly:
-df -h /opt/local-path-provisioner/
-du -sh /opt/local-path-provisioner/*/
+df -h /var/lib/rancher/k3s/storage/
+du -sh /var/lib/rancher/k3s/storage/*/
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)

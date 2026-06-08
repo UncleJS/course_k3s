@@ -664,7 +664,7 @@ spec:
 
 Or the Traefik-native `IngressRoute` CRD (more features — middlewares, TCP routes):
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: taskr-web

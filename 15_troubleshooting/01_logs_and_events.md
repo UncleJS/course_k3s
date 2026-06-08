@@ -140,34 +140,29 @@ sudo journalctl -u k3s-agent -n 200 --no-pager
 
 ### Log Levels
 
-k3s uses logrus for structured logging. The default log level is `info`. Log levels in order of
-verbosity:
+k3s uses logrus for structured logging. By default it logs at `info`. k3s does **not** accept a
+`--log-level` flag — debug logging is a single boolean: the `--debug` flag (or `debug: true` in
+`/etc/rancher/k3s/config.yaml`). Messages are tagged `level=info|warning|error|fatal`; `--debug`
+adds `level=debug` lines.
 
-| Level | Flag | When to use |
+| Level | How it appears | Notes |
 |---|---|---|
-| `trace` | `--log-level trace` | Deep internal debugging |
-| `debug` | `--log-level debug` | Development and detailed tracing |
-| `info` | (default) | Normal operations |
-| `warn` | — | Warning conditions (output automatically) |
-| `error` | — | Errors (output automatically) |
-| `fatal` | — | Fatal errors causing exit |
+| `debug` | enable with `--debug` / `debug: true` | Development and detailed tracing |
+| `info` | default | Normal operations |
+| `warning` | always emitted | Warning conditions |
+| `error` | always emitted | Errors |
+| `fatal` | always emitted | Fatal errors causing exit |
 
-To temporarily enable debug logging:
+To temporarily enable debug logging, set it in the config file and restart:
 
 ```bash
-# Add --log-level=debug to k3s service configuration
-sudo mkdir -p /etc/systemd/system/k3s.service.d/
-cat > /etc/systemd/system/k3s.service.d/debug.conf <<'EOF'
-[Service]
-Environment=K3S_DEBUG=true
-EOF
-
-sudo systemctl daemon-reload
+# Enable debug logging via the k3s config file
+echo 'debug: true' | sudo tee -a /etc/rancher/k3s/config.yaml
 sudo systemctl restart k3s
 
-# Remember to remove this override after debugging
-sudo rm /etc/systemd/system/k3s.service.d/debug.conf
-sudo systemctl daemon-reload && sudo systemctl restart k3s
+# Remember to remove the line after debugging, then restart again
+sudo sed -i '/^debug: true$/d' /etc/rancher/k3s/config.yaml
+sudo systemctl restart k3s
 ```
 
 ### What to Look For in k3s Logs
@@ -831,6 +826,15 @@ helm install fluent-bit fluent/fluent-bit \
 | CRI image list | `sudo k3s crictl images` |
 | Pod restart counts | `kubectl get pods -A -o json | jq '...'` |
 | Audit log (recent) | `sudo tail -f /var/log/k3s-audit.log | jq .` |
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Troubleshooting](https://docs.k3s.io/installation/troubleshooting)
+- [Kubernetes — Troubleshooting Applications](https://kubernetes.io/docs/tasks/debug/debug-application/)
+- [Troubleshooting Cheatsheet](../cheatsheets/troubleshooting-cheatsheet.md)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

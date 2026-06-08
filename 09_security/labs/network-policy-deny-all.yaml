@@ -10,9 +10,10 @@
 #   - allow-internal policy that lets the client reach nginx on port 80
 #   - allow-dns policy that lets all pods resolve DNS
 #
-# IMPORTANT: NetworkPolicies are silently ignored with the default Flannel CNI.
-# You must use Canal, Calico, or Cilium for policies to be enforced.
-# See 02_network_policies.md for CNI swap instructions.
+# NOTE: Stock k3s enforces these policies out of the box (built-in NetworkPolicy
+# controller on the default Flannel backend). They are only NOT enforced if k3s was
+# installed with --disable-network-policy, or Flannel was replaced by a CNI lacking a
+# policy engine. See 02_network_policies.md for details.
 #
 # Apply:   kubectl apply -f network-policy-deny-all.yaml
 # Cleanup: kubectl delete namespace netpol-demo

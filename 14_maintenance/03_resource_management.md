@@ -526,11 +526,22 @@ If you hit SQLite performance limits, migrate to embedded etcd:
 
 ```yaml
 # /etc/rancher/k3s/config.yaml
-# Reduce API server memory usage (at the cost of watch cache efficiency)
+# ⚠ ADVANCED / LAST RESORT: disabling the watch cache lowers apiserver RAM but shifts
+# read load onto the datastore (kine/etcd) and usually makes a small node SLOWER.
+# Prefer reducing object count or moving to embedded etcd before reaching for this.
 kube-apiserver-arg:
   - "watch-cache=false"
   - "default-watch-cache-size=0"
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Kubernetes — Resource Management for Pods](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+- [Kubernetes — Quality of Service Classes](https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/)
+- [Kubernetes — Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -110,27 +110,25 @@ timeline
     title k3s Timeline
     2019 : Rancher Labs releases k3s v0.1
          : First Kubernetes distro under 40 MB
-    2020 : k3s donated to CNCF as Sandbox project
+    2020 : k3s donated to CNCF as a Sandbox project
+         : SUSE acquires Rancher Labs
          : Gains ARM64 and ARMv7 support
-    2021 : k3s promoted to CNCF Incubating status
-         : Embedded etcd HA introduced
-    2022 : SUSE acquires Rancher Labs
-         : k3s follows k8s release cadence
-    2023 : k3s promoted to CNCF Graduated status
-         : Widely adopted for edge and IoT
+    2021 : Embedded etcd HA introduced
+    2022 : k3s follows k8s release cadence
+    2023 : Widely adopted for edge and IoT
     2024 : Stable v1.28/v1.29 releases
          : First-class support for ARM SBCs
     2025 : v1.30/v1.31 with improved HA
          : Enhanced SELinux and rootless support
 ```
 
-The name "k3s" comes from: if "k8s" is Kubernetes (k + 8 letters + s), then half of Kubernetes would be "k3s" (k + 3 letters + s) — a "5 less than k8s" joke about being lighter.
+The name **k3s** is a play on **k8s**: "Kubernetes" is abbreviated k8s because there are 8 letters between the `k` and the `s`. The team wanted something "half the size" of a full k8s, so they called it k3s. Notably, k3s has **no long-form spelling** — unlike k8s, it does not stand for a longer word; the project deliberately left it without an expansion.
 
 ### Why Rancher Built It
 
 Rancher Labs was already deeply invested in Kubernetes tooling (Rancher, RKE) when they saw a gap: enterprise customers wanted to run Kubernetes at the edge — on thin clients, gateway devices, and factory floor machines — but the resource requirements were prohibitive. Rather than strip down k8s manually for each deployment, they created a reproducible, conformant, minimal distribution. The first version was so small it could run on a single 512 MB node — something that was unthinkable with vanilla Kubernetes at the time.
 
-SUSE's acquisition of Rancher Labs in 2021 gave k3s enterprise backing without changing its open-source trajectory. It remains one of the fastest-growing Kubernetes distributions and is now a CNCF Graduated project alongside Kubernetes itself.
+SUSE's acquisition of Rancher Labs in 2020 gave k3s enterprise backing without changing its open-source trajectory. It remains one of the fastest-growing Kubernetes distributions and is a CNCF Sandbox project.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -220,11 +218,11 @@ The binary also acts as a multiplexer for sub-commands: `k3s kubectl` is identic
 
 ## k3s in the CNCF Landscape
 
-The Cloud Native Computing Foundation (CNCF) hosts the Kubernetes ecosystem. k3s is a Graduated project — the highest maturity tier, alongside Kubernetes itself, Prometheus, Helm, and Argo.
+The Cloud Native Computing Foundation (CNCF) hosts the Kubernetes ecosystem. k3s is a CNCF **Sandbox** project, and it is built around — and interoperates with — graduated CNCF projects such as Kubernetes itself, Prometheus, Helm, and Argo.
 
 ```mermaid
 graph LR
-    K3S["k3s<br/>(CNCF Graduated)"]
+    K3S["k3s<br/>(CNCF Sandbox)"]
 
     K3S --> CNCF["CNCF<br/>(Project Host)"]
     K3S --> HELM["Helm<br/>(Package Manager)"]
@@ -243,7 +241,7 @@ graph LR
     style FLANNEL fill:#22c55e,color:#fff
 ```
 
-### How k3s Relates to Other Graduated Projects
+### How k3s Relates to Other CNCF Projects
 
 **Helm** — k3s includes a built-in Helm controller. You deploy Helm charts by creating `HelmChart` CRDs in the cluster, and the Helm controller installs them automatically. This means you get GitOps-style Helm management without installing the Helm CLI.
 
@@ -257,7 +255,7 @@ graph LR
 
 **Rancher** — k3s clusters can be imported into Rancher for centralized multi-cluster management. This is the canonical enterprise pattern for managing many k3s edge nodes from a central Rancher instance.
 
-CNCF graduation means k3s has:
+As a CNCF project with broad production adoption, k3s has:
 - Demonstrated production usage at scale by multiple independent organizations
 - A clearly defined governance model and code of conduct
 - A security vulnerability disclosure process

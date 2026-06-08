@@ -242,8 +242,8 @@ sudo k3s etcd-snapshot ls
 
 # Check etcd health via etcdctl
 export ETCDCTL_CACERT=/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt
-export ETCDCTL_CERT=/var/lib/rancher/k3s/server/tls/etcd/client.crt
-export ETCDCTL_KEY=/var/lib/rancher/k3s/server/tls/etcd/client.key
+export ETCDCTL_CERT=/var/lib/rancher/k3s/server/tls/etcd/server-client.crt
+export ETCDCTL_KEY=/var/lib/rancher/k3s/server/tls/etcd/server-client.key
 export ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
 export ETCDCTL_API=3
 
@@ -355,5 +355,15 @@ kubectl get nodes          # from your workstation (via LB)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [k3s — High Availability with Embedded etcd](https://docs.k3s.io/datastore/ha-embedded)
+- [k3s — Cluster Datastore Options](https://docs.k3s.io/datastore)
+- [etcd Documentation](https://etcd.io/docs/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

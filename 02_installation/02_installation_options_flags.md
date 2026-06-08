@@ -484,11 +484,12 @@ tls-san:
   - "new-ip-or-hostname.example.com"
 EOF
 
-# 2. Rotate certificates
+# 2. Stop k3s, then rotate (rotation requires the service stopped)
+sudo systemctl stop k3s
 sudo k3s certificate rotate
 
-# 3. Restart k3s
-sudo systemctl restart k3s
+# 3. Start k3s
+sudo systemctl start k3s
 
 # 4. Copy the new kubeconfig
 sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
@@ -526,11 +527,15 @@ sudo mkdir -p /var/lib/rancher/k3s/server/tls
 k3s certificates expire after 1 year by default. They are automatically rotated when they have less than 90 days remaining. To manually rotate:
 
 ```bash
-# Force certificate rotation
+# Force certificate rotation (the service must be stopped first)
+sudo systemctl stop k3s
 sudo k3s certificate rotate
+sudo systemctl start k3s
 
-# Check certificate expiry
-sudo k3s certificate check
+# Check certificate expiry (there is no `k3s certificate check` subcommand —
+# inspect the serving cert directly):
+sudo openssl x509 -enddate -noout \
+  -in /var/lib/rancher/k3s/server/tls/serving-kube-apiserver.crt
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)

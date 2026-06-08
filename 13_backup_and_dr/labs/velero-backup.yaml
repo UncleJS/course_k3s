@@ -223,7 +223,11 @@ spec:
 # =============================================================================
 # Restore the entire 'default' namespace from the named backup.
 #
-# Apply: kubectl apply -f velero-backup.yaml   (or create via CLI)
+# ⚠ DISABLED BY DEFAULT: the Restore object is commented out below so that
+#   `kubectl apply -f velero-backup.yaml` does NOT trigger a restore the moment you
+#   create the Backup/Schedule. Restore only when you actually need it — prefer the
+#   CLI form below, or uncomment the block.
+#
 # CLI equivalent:
 #   velero restore create default-ns-restore \
 #     --from-backup default-namespace-backup \
@@ -232,41 +236,42 @@ spec:
 # Monitor: velero restore describe default-ns-restore --details
 #          velero restore logs default-ns-restore
 # =============================================================================
-apiVersion: velero.io/v1
-kind: Restore
-metadata:
-  name: default-ns-restore
-  namespace: velero
-  labels:
-    app.kubernetes.io/name: velero
-    restore-type: namespace
-spec:
-  # The name of the Backup resource to restore from
-  backupName: default-namespace-backup
-
-  # ---- Namespace scope ----------------------------------------------
-  includedNamespaces:
-    - default
-
-  # Optional namespace mapping — restore into a different namespace:
-  # namespaceMapping:
-  #   default: default-restored
-
-  # ---- Resource filters --------------------------------------------
-  excludedResources:
-    - nodes
-    - events
-    - persistentvolumes   # Let the StorageClass re-provision dynamically
-
-  # ---- Volume data -------------------------------------------------
-  # Restore PVC data that was captured by Restic/Kopia:
-  restorePVs: true
-
-  # ---- Conflict policy ---------------------------------------------
-  # What to do if a resource already exists in the cluster:
-  # Options: none (skip existing), update
-  existingResourcePolicy: none
-
-  # ---- Hooks (optional) -------------------------------------------
-  # hooks:
-  #   resources: []
+# --- Uncomment to enable (do NOT apply this together with the Backup above) ---
+# apiVersion: velero.io/v1
+# kind: Restore
+# metadata:
+#   name: default-ns-restore
+#   namespace: velero
+#   labels:
+#     app.kubernetes.io/name: velero
+#     restore-type: namespace
+# spec:
+#   # The name of the Backup resource to restore from
+#   backupName: default-namespace-backup
+#
+#   # ---- Namespace scope ----------------------------------------------
+#   includedNamespaces:
+#     - default
+#
+#   # Optional namespace mapping — restore into a different namespace:
+#   # namespaceMapping:
+#   #   default: default-restored
+#
+#   # ---- Resource filters --------------------------------------------
+#   excludedResources:
+#     - nodes
+#     - events
+#     - persistentvolumes   # Let the StorageClass re-provision dynamically
+#
+#   # ---- Volume data -------------------------------------------------
+#   # Restore PVC data that was captured by Restic/Kopia:
+#   restorePVs: true
+#
+#   # ---- Conflict policy ---------------------------------------------
+#   # What to do if a resource already exists in the cluster:
+#   # Options: none (skip existing), update
+#   existingResourcePolicy: none
+#
+#   # ---- Hooks (optional) -------------------------------------------
+#   # hooks:
+#   #   resources: []

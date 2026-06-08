@@ -1069,9 +1069,12 @@ curl -f https://taskr-canary.example.com/health
 # (Stop the Docker web containers but keep DB running for comparison)
 docker stop taskr_web_1
 
-# Step 3: Final data sync (catch any writes since the initial dump)
+# Step 3: Final data reload — this is a FULL dump+restore, NOT an incremental sync.
+# --clean --if-exists makes the dump DROP and recreate objects so it applies cleanly
+# over the already-populated target inside a single transaction (a plain dump without
+# it would hit "already exists" errors and roll the whole transaction back).
 docker exec -e PGPASSWORD="$PG_PASSWORD" "$PG_CONTAINER" \
-  pg_dump -U taskr -d taskr --no-owner --no-acl -F plain \
+  pg_dump -U taskr -d taskr --no-owner --no-acl --clean --if-exists -F plain \
   > /tmp/taskr-final-dump.sql
 kubectl cp /tmp/taskr-final-dump.sql taskr/postgres-0:/tmp/taskr-final-dump.sql
 kubectl exec -n taskr postgres-0 -- \

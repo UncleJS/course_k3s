@@ -166,7 +166,7 @@ The tradeoff: standard `Ingress` is portable (works on any cluster) but you need
 The `IngressRoute` CRD exposes Traefik's full routing engine directly in Kubernetes YAML. It's Traefik-specific, but in practice if you're running k3s you're running Traefik, so the portability cost is negligible.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: myapp-route
@@ -237,7 +237,7 @@ sequenceDiagram
 Path-based routing sends different URL paths to different backend services — a common pattern for microservice frontends where a single hostname serves an API, a static CDN, and a frontend SPA.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: path-routing
@@ -314,7 +314,7 @@ flowchart TD
 Host-based (virtual) routing sends requests to different services based on the `Host` header. This is the standard way to run multiple applications on a single cluster IP.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: host-routing
@@ -427,7 +427,7 @@ Each middleware is declared as an independent CRD resource and referenced by nam
 The most common middleware: catch HTTP traffic and redirect permanently to HTTPS.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: https-redirect
@@ -438,7 +438,7 @@ spec:
     permanent: true   # 301 — tells browsers and crawlers to update bookmarks
 ---
 # Listen on HTTP, redirect everything to HTTPS
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: http-catch
@@ -463,7 +463,7 @@ spec:
 A comprehensive security headers middleware protects against XSS, clickjacking, MIME sniffing, and enforces HTTPS via HSTS:
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: secure-headers
@@ -498,7 +498,7 @@ spec:
 Rate limiting protects backends from abuse, DDoS, and runaway clients. Traefik's built-in rate limiter uses a token-bucket algorithm.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: api-rate-limit
@@ -545,7 +545,7 @@ Apply different limits to different routes:
 ```yaml
 # Strict limits for login endpoint
 ---
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: login-rate-limit
@@ -558,7 +558,7 @@ spec:
 
 # Generous limits for API reads
 ---
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: api-read-limit
@@ -606,7 +606,7 @@ stringData:
     admin:$apr1$xyz$abc123...
     devuser:$apr1$abc$xyz456...
 ---
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: admin-auth
@@ -620,7 +620,7 @@ spec:
 
 ```yaml
 # Apply to the admin route
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: admin-route
@@ -653,7 +653,7 @@ When your backend service doesn't know it's mounted at a path prefix, you need t
 ### Strip Prefix
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: strip-api-prefix
@@ -672,7 +672,7 @@ spec:
 The inverse: add a prefix before forwarding (useful when upstream expects it):
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: add-v1-prefix
@@ -697,7 +697,7 @@ flowchart LR
 ### Path Prefix in Practice: API Gateway Pattern
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: api-gateway
@@ -799,7 +799,7 @@ Use these priority ranges for consistency:
 Traefik supports weighted traffic splitting natively via the `TraefikService` CRD. This enables canary releases and blue-green deployments without needing a service mesh.
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: TraefikService
 metadata:
   name: weighted-app
@@ -814,7 +814,7 @@ spec:
       port: 80
       weight: 10             # 10% of traffic
 ---
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: canary-route
@@ -874,7 +874,7 @@ TCP routing matches on TLS SNI (Server Name Indication) — the hostname from th
 #     port: 5432
 #     protocol: TCP
 
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRouteTCP
 metadata:
   name: postgres-route
@@ -908,7 +908,7 @@ routes:
 ### UDP Routing
 
 ```yaml
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRouteUDP
 metadata:
   name: dns-route
@@ -1020,7 +1020,7 @@ spec:
     targetPort: 8080
 ---
 # 2. TraefikService for weighted split
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: TraefikService
 metadata:
   name: canary-split
@@ -1035,7 +1035,7 @@ spec:
       weight: 10
 ---
 # 3. IngressRoute references the TraefikService
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: app-route
@@ -1109,5 +1109,15 @@ kubectl delete -f labs/ingress-basic.yaml
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Kubernetes — Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+- [Traefik — Kubernetes IngressRoute (CRD)](https://doc.traefik.io/traefik/routing/providers/kubernetes-crd/)
+- [Traefik — Middlewares](https://doc.traefik.io/traefik/middlewares/overview/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

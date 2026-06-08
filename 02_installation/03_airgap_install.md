@@ -199,12 +199,22 @@ sequenceDiagram
 K3S_VERSION="YOUR_K3S_VERSION"   # Example: v1.30.3+k3s1
 ARCH="amd64"   # or arm64 for ARM servers, arm for ARMv7
 
+# The k3s release binary asset name differs by architecture:
+#   amd64 -> k3s, arm64 -> k3s-arm64, arm (ARMv7) -> k3s-armhf
+case "$ARCH" in
+  amd64) K3S_BIN="k3s" ;;
+  arm64) K3S_BIN="k3s-arm64" ;;
+  arm)   K3S_BIN="k3s-armhf" ;;
+  *) echo "Unsupported ARCH: $ARCH" >&2; exit 1 ;;
+esac
+
 OUTPUT_DIR="./k3s-airgap-${K3S_VERSION}"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=== Downloading k3s binary ==="
+# Always save it locally as 'k3s' (the install expects that name)
 curl -Lo "${OUTPUT_DIR}/k3s" \
-  "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s"
+  "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/${K3S_BIN}"
 
 echo "=== Downloading air-gap images ==="
 # These are all the container images k3s needs pre-loaded

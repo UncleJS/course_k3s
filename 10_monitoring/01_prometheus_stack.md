@@ -142,7 +142,7 @@ helm install kube-prometheus-stack \
   --version 58.1.3   # pin to a known good version
 ```
 
-> **k3s-specific note:** k3s ships with an embedded etcd that uses different TLS certificates than what kube-prometheus-stack expects. Disable etcd monitoring in your values file (covered in the lab) or you will see persistent scrape errors.
+> **k3s-specific note:** a single-server k3s uses **SQLite (kine)** as its datastore by default, so there is no etcd to scrape; embedded etcd is only present in HA mode (`--cluster-init` / 3+ servers), and even then it uses TLS certificates at a non-standard path that kube-prometheus-stack does not expect. Either way, disable etcd monitoring in your values file (covered in the lab) or you will see persistent scrape errors.
 
 ### Step 4 — Verify the installation
 
@@ -531,6 +531,15 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 # In the Prometheus UI Expression field, enter:
 # 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [kube-prometheus-stack (Helm chart)](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
+- [Prometheus Operator — Design](https://prometheus-operator.dev/docs/getting-started/design/)
+- [Prometheus Documentation](https://prometheus.io/docs/introduction/overview/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

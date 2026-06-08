@@ -24,7 +24,10 @@ metadata:
   labels:
     app: affinity-demo
 spec:
-  replicas: 4
+  # 3 replicas to match the 3 worker nodes labeled above. The hard
+  # podAntiAffinity below permits at most one replica per node, so a 4th
+  # replica would stay Pending on this setup.
+  replicas: 3
   selector:
     matchLabels:
       app: affinity-demo

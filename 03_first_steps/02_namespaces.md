@@ -130,7 +130,7 @@ graph TB
 | Job / CronJob | ClusterRoleBinding |
 | Service | CustomResourceDefinition (CRD) |
 | ConfigMap | IngressClass |
-| Secret | PodSecurityPolicy (deprecated) |
+| Secret | RuntimeClass |
 | PersistentVolumeClaim | ValidatingWebhookConfiguration |
 | ServiceAccount | MutatingWebhookConfiguration |
 | Ingress | APIService |

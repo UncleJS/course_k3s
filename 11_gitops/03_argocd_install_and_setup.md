@@ -240,10 +240,10 @@ kubectl create namespace argocd
 ### Install
 
 ```bash
+# --version pins the chart (use a concrete version like 6.7.11 in production)
 helm install argocd argo/argo-cd \
   --namespace argocd \
-  # pin a version
-  --version 6.7.x \
+  --version '6.7.*' \
   --set server.service.type=NodePort \
   --set server.service.nodePortHttp=30080 \
   --set server.service.nodePortHttps=30443
@@ -735,6 +735,15 @@ argocd app get nginx-helm-demo --watch
 # 7. Check health
 argocd app list
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [Argo CD — Getting Started](https://argo-cd.readthedocs.io/en/stable/getting_started/)
+- [Argo CD — Declarative Setup](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
+- [Argo CD — Application Specification](https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

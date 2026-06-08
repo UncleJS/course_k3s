@@ -769,6 +769,15 @@ GitOps is powerful, but it is not the right tool for every situation. Apply crit
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Flux — Manage Helm Releases](https://fluxcd.io/flux/guides/helmreleases/)
+- [Argo CD — App of Apps Pattern](https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/)
+- [Argo CD — Sync Options](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
 
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

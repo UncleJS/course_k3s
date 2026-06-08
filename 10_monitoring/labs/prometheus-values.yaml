@@ -17,7 +17,7 @@ defaultRules:
   create: true
   rules:
     # Disable components that are not applicable to k3s
-    etcd: false                   # k3s uses embedded etcd with different certs
+    etcd: false                   # single-server k3s has no etcd (SQLite/kine); HA etcd uses non-standard certs
     kubeControllerManager: false  # not exposed on the standard port in k3s
     kubeScheduler: false          # not exposed on the standard port in k3s
     kubeProxy: false              # k3s uses kube-proxy differently
@@ -248,8 +248,9 @@ kube-state-metrics:
 # DISABLED COMPONENTS (k3s-specific)
 # ==============================================================================
 
-# k3s uses an embedded etcd with self-signed certs at a non-standard path
-# Enabling this causes persistent scrape errors
+# Single-server k3s uses SQLite (kine), so there is no etcd to scrape; HA k3s uses
+# embedded etcd with self-signed certs at a non-standard path. Enabling this causes
+# persistent scrape errors either way.
 kubeEtcd:
   enabled: false
 

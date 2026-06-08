@@ -124,8 +124,10 @@ kube-apiserver-arg:
   # Disable anonymous authentication (any unauthenticated request is rejected)
   - "anonymous-auth=false"
 
-  # Restrict which admission plugins are active
-  - "enable-admission-plugins=NodeRestriction,PodSecurity,ServiceAccount,EventRateLimit"
+  # Restrict which admission plugins are active.
+  # (Note: EventRateLimit is intentionally omitted — it fails to start the apiserver
+  #  unless you also supply an --admission-control-config-file with its Configuration.)
+  - "enable-admission-plugins=NodeRestriction,PodSecurity,ServiceAccount"
 
   # Disable profiling endpoint (reduces attack surface)
   - "profiling=false"
@@ -137,9 +139,11 @@ kube-apiserver-arg:
   - "audit-log-maxsize=100"
   - "audit-policy-file=/etc/k3s/audit-policy.yaml"
 
-  # Restrict API server to bind on specific interface only
-  - "bind-address=0.0.0.0"          # change to specific IP in production
-  - "secure-port=6443"
+  # NOTE: do NOT set kube-apiserver bind-address/secure-port here. In k3s the API
+  # server listen address and port are managed by the k3s flags --bind-address,
+  # --advertise-address, and --https-listen-port — overriding them via
+  # kube-apiserver-arg can conflict with k3s's own configuration. See the
+  # "Limiting API Server Exposure" section for restricting access.
 
   # TLS hardening — restrict to strong cipher suites
   - "tls-min-version=VersionTLS12"
@@ -149,7 +153,7 @@ kube-apiserver-arg:
   - "encryption-provider-config=/etc/k3s/encryption-config.yaml"
 
   # Service account token security
-  - "service-account-lookup=true"        # verify SA tokens against etcd on every request
+  - "service-account-lookup=true"        # verify SA tokens against the datastore on every request
   - "service-account-issuer=https://kubernetes.default.svc"
 
   # Request timeout
@@ -728,7 +732,7 @@ Use this checklist as a baseline before promoting a cluster to production:
 
 ### Network
 
-- [ ] CNI supports NetworkPolicies (Canal, Calico, or Cilium — not vanilla Flannel)
+- [ ] NetworkPolicy enforcement confirmed (stock k3s enforces by default; verify it was not disabled with `--disable-network-policy`)
 - [ ] `deny-all` NetworkPolicy in every application namespace
 - [ ] API server port (6443) not exposed to the internet
 - [ ] `allow-dns` NetworkPolicy present in deny-all namespaces
@@ -847,6 +851,15 @@ kubectl exec -it test-shell -- sh   # this triggers "Terminal shell in container
 # Clean up
 kubectl delete pod test-shell
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Hardening Guide](https://docs.k3s.io/security/hardening-guide)
+- [k3s — CIS Benchmark Self-Assessment](https://docs.k3s.io/security/self-assessment)
+- [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -378,10 +378,7 @@ tls: failed to verify certificate
 ### Diagnosis
 
 ```bash
-# Check k3s certificate expiry
-sudo k3s certificate check
-
-# Or inspect manually
+# Inspect certificate expiry directly (there is no `k3s certificate check` subcommand)
 sudo openssl x509 -in /var/lib/rancher/k3s/server/tls/server-ca.crt \
   -noout -dates
 
@@ -398,23 +395,32 @@ chronyc tracking
 
 ```bash
 # k3s certificates expire after 1 year (auto-renewed if k3s restarts before expiry)
-# Force certificate rotation:
+# Force rotation of the LEAF certificates (rotation requires the service stopped):
+sudo systemctl stop k3s
 sudo k3s certificate rotate
-
-# Restart to apply:
-sudo systemctl restart k3s
+sudo systemctl start k3s
 ```
 
 ### Fix: Certificate Mismatch (node added with wrong IP/hostname)
 
+A hostname/IP change usually just means the serving cert is missing a SAN. Add the new name as a
+`tls-san` and rotate the leaf certs — **do not** delete the files under `server/tls/`:
+
 ```bash
-# Regenerate certificates after a hostname/IP change:
+# 1. Add the new name/IP to /etc/rancher/k3s/config.yaml under tls-san:
+#    tls-san:
+#      - new-name-or-ip
+# 2. Rotate leaf certificates (service stopped):
 sudo systemctl stop k3s
-sudo rm -f /var/lib/rancher/k3s/server/tls/*.crt
-sudo rm -f /var/lib/rancher/k3s/server/tls/*.key
+sudo k3s certificate rotate
 sudo systemctl start k3s
-# k3s will regenerate all certificates on startup
 ```
+
+> ⚠ **Do not** `rm` the CA files (`server-ca.*`, `client-ca.*`, etc.) under
+> `/var/lib/rancher/k3s/server/tls/`. Deleting a CA makes k3s generate a **new** CA on startup,
+> which invalidates every existing node, agent token, and kubeconfig and breaks a multi-node
+> cluster. Only `k3s certificate rotate` (leaf certs) or `k3s certificate rotate-ca` (a deliberate,
+> documented CA rotation) are safe.
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
@@ -574,6 +580,15 @@ kubectl auth can-i list pods \
   --as system:serviceaccount:my-app:my-sa
 # yes
 ```
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
+
+## Further Reading
+
+- [k3s — Troubleshooting](https://docs.k3s.io/installation/troubleshooting)
+- [Kubernetes — Debug Running Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)
+- [Kubernetes — Debug Services](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/)
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 

@@ -33,7 +33,7 @@
 |---------|-------------|
 | `kubectl cluster-info` | Show cluster endpoint URLs |
 | `kubectl cluster-info dump` | Full cluster diagnostic dump |
-| `kubectl version --short` | Client and server versions |
+| `kubectl version` | Client and server versions |
 | `kubectl api-resources` | All available resource types |
 | `kubectl api-versions` | All available API versions |
 | `kubectl explain pod.spec.containers` | Field docs for any resource |

@@ -280,7 +280,7 @@ curl -sfL https://get.k3s.io | sh -s - \
   --flannel-backend=none \
   --disable-network-policy \
   --disable-kube-proxy \
-  --disable servicelb
+  --disable=servicelb
 
 # 2. Install Cilium CLI
 CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
@@ -288,7 +288,8 @@ curl -Lo /tmp/cilium-linux-amd64.tar.gz \
   "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz"
 tar -C /usr/local/bin -xzf /tmp/cilium-linux-amd64.tar.gz
 
-# 3. Install Cilium
+# 3. Install Cilium (point the CLI at the k3s kubeconfig first)
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 cilium install --set k8sServiceHost=<NODE_IP> --set k8sServicePort=6443
 
 # 4. Verify

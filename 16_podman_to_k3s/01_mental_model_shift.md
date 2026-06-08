@@ -446,7 +446,7 @@ Key mechanisms:
 
 ### How k3s Rootless Works
 
-k3s rootless mode (available since v1.24) uses a different approach:
+k3s rootless mode (still **experimental** — not production-ready the way rootless Podman is) uses a different approach:
 
 ```bash
 # Install k3s as a regular user
@@ -657,8 +657,8 @@ spec:
 ```
 
 **Common k3s taint patterns:**
-- Server nodes in k3s are automatically tainted `node-role.kubernetes.io/master:NoSchedule` (by default in older versions)
-- Use `--node-taint` at install time to reserve nodes for specific workloads
+- k3s server nodes are **schedulable by default** — they are *not* automatically tainted, so workloads run on them unless you opt out. (The role label/taint key is `node-role.kubernetes.io/control-plane`; the old `master` name is deprecated.)
+- Pass `--node-taint node-role.kubernetes.io/control-plane:NoSchedule` at install time if you want to keep workloads off a server node, or use `--node-taint` to reserve nodes for specific workloads
 
 ### Why This Matters for Podman Users
 
@@ -798,5 +798,15 @@ Before moving on, make sure you can answer yes to each of these:
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Kubernetes — Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
+- [Podman Documentation](https://docs.podman.io/en/latest/)
+- [Podman — Generate Kubernetes YAML (podman kube generate)](https://docs.podman.io/en/latest/markdown/podman-kube-generate.1.html)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

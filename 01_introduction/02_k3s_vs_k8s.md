@@ -33,7 +33,7 @@
 | Default datastore | etcd (external) | SQLite (embedded) |
 | HA datastore | etcd (external) | Embedded etcd or external DB |
 | Default CNI | None (must install) | Flannel (built-in) |
-| Default Ingress | None (must install) | Traefik v2 (built-in) |
+| Default Ingress | None (must install) | Traefik v3 (built-in) |
 | Default LoadBalancer | None (cloud or MetalLB) | Klipper (built-in) |
 | Default Storage | None (must install) | local-path-provisioner |
 | Helm support | Helm CLI required | HelmChart CRD + Helm controller |
@@ -145,7 +145,7 @@ Some components are not removed but swapped for lighter-weight equivalents that 
 | Datastore (single node) | External etcd | SQLite | etcd requires 3 nodes for HA; SQLite works for one node with zero ops |
 | Datastore (HA) | External etcd cluster | Embedded etcd | Manages etcd internally; no separate etcd cluster to operate |
 | CNI plugin | Must install manually | Flannel (VXLAN) | Works on all hardware, simple to operate, zero-config |
-| Ingress controller | Must install manually | Traefik v2 | Lightweight, integrates with Let's Encrypt, runs on 64 MB |
+| Ingress controller | Must install manually | Traefik v3 | Lightweight, integrates with Let's Encrypt, runs on 64 MB |
 | Service LoadBalancer | Cloud LB or MetalLB | Klipper LB | Uses host ports on nodes; no cloud API or BGP required |
 | Storage provisioner | Must install manually | local-path-provisioner | Creates `hostPath` PVs automatically; zero-config |
 | Helm charts deployment | Helm CLI + tiller/v3 | HelmChart CRD + controller | Declarative, GitOps-friendly, no CLI needed on the node |

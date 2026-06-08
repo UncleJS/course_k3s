@@ -138,7 +138,7 @@ helm list --all-namespaces
 
 ```bash
 # Add popular repositories
-helm repo add stable       https://charts.helm.sh/stable
+# (the old `stable` repo at charts.helm.sh/stable is archived/deprecated — don't use it)
 helm repo add bitnami      https://charts.bitnami.com/bitnami
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add jetstack     https://charts.jetstack.io
@@ -429,5 +429,15 @@ helm uninstall nginx-demo -n helm-demo
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [Helm Documentation](https://helm.sh/docs/)
+- [Helm — Using Helm (quickstart)](https://helm.sh/docs/intro/using_helm/)
+- [Artifact Hub (chart registry)](https://artifacthub.io/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*

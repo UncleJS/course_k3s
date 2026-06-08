@@ -97,7 +97,7 @@ kubectl get pods -n cert-manager
 
 ## ClusterIssuers: Let's Encrypt Staging and Production
 
-Always test with the **staging** issuer first — Let's Encrypt production has strict rate limits (5 certificates per registered domain per week).
+Always test with the **staging** issuer first — Let's Encrypt production has strict rate limits (50 certificates per registered domain per week, plus a separate limit of 5 duplicate certificates per week).
 
 ```yaml
 # Staging — use for testing, certificate is NOT trusted by browsers
@@ -369,7 +369,7 @@ spec:
     kind: ClusterIssuer
   dnsNames: [myapp.example.com]
 ---
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: myapp-secure
@@ -391,7 +391,7 @@ spec:
 
 ## Certificate Renewal
 
-cert-manager automatically renews certificates before they expire (default: 15 days before). No manual action required.
+cert-manager automatically renews certificates before they expire. By default it renews when roughly one-third of the lifetime remains — about 30 days before expiry for a 90-day Let's Encrypt certificate (consistent with the `renewBefore` discussion above). No manual action required.
 
 ```bash
 # Check certificate expiry
@@ -402,13 +402,12 @@ kubectl get certificate -A
 # See detailed status including expiry
 kubectl describe certificate myapp-cert | grep -A5 "Renewal Time"
 
-# Force an immediate renewal (if needed)
-kubectl delete secret myapp-tls
-# cert-manager will re-issue automatically
+# Force an immediate renewal with the cert-manager CLI (preferred)
+cmctl renew myapp-cert
+# (install cmctl: https://cert-manager.io/docs/reference/cmctl/)
 
-# Or annotate to trigger renewal
-kubectl annotate certificate myapp-cert \
-  cert-manager.io/renew-immediately="true"
+# Alternatively, delete the secret — cert-manager re-issues automatically
+kubectl delete secret myapp-tls
 ```
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
@@ -473,5 +472,15 @@ curl -v https://myapp.example.com/ 2>&1 | grep -E "SSL|subject|issuer"
 
 [↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
 
+
+## Further Reading
+
+- [cert-manager Documentation](https://cert-manager.io/docs/)
+- [cert-manager — ACME / Let's Encrypt Issuers](https://cert-manager.io/docs/configuration/acme/)
+- [Let's Encrypt — Rate Limits](https://letsencrypt.org/docs/rate-limits/)
+
+[↑ Back to TOC](#table-of-contents) · [↑ Course Index](../README.md)
+
 ---
+
 *Licensed under [CC BY-NC-SA 4.0](../LICENSE.md) · © 2026 UncleJS*
